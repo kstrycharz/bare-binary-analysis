@@ -12,6 +12,9 @@ points:
 conventions the code is held to. `ADR.md` records architecture decisions with
 their rejected alternatives.
 
+`CONTAINERS.md` describes every container in a deployment: what it does, what
+it talks to, what happens when it dies, and which of them hold privilege.
+
 `feature-request.md` in the repository root is the bounty list: wanted features,
 each scoped so someone can build it on a branch and have it judged on whether it
 works. Start there if you are looking for something to pick up.

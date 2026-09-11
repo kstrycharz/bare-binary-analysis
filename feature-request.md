@@ -96,7 +96,12 @@ cannot grow a row without bound.
 
 ---
 
-### `container-docs` — document what each container is for · **S**
+### ~~`container-docs`~~ — document what each container is for · **S** · **DONE**
+
+Delivered as [docs/CONTAINERS.md](docs/CONTAINERS.md).
+
+<details>
+<summary>Original bounty</summary>
 
 `docker compose up` starts twelve services and builds five images. What each one
 does is currently spread across comments in `docker-compose.yml`, three
@@ -117,6 +122,7 @@ containers.
 
 **Done when:** someone who has never seen the repo can read it and correctly
 answer "why are there two workers" and "which of these could hurt me".
+</details>
 
 ---
 
@@ -195,6 +201,145 @@ and running through the real driver, producing *one* useful thing — a function
 count, or the xrefs to a single string offset that a rule already matched. A
 narrow vertical slice that reaches the database is worth more than a broad one
 that doesn't.
+
+**Consider taking `analyzer-plugin` first.** Ghidra is the obvious bolt-on
+module — a big, slow, JVM-based analyzer that has no business living in the same
+image as anything else. If the plugin interface exists, this bounty becomes
+"write an image and a manifest" instead of "modify the orchestrator", and the
+interface gets designed against a genuinely demanding analyzer rather than
+against the three small Python ones that already agree with each other.
+
+---
+
+### `runs-live` — the Runs tab does not show runs that are running · **S**
+
+Start a scan, click **Runs**, and the run you just started is often not there.
+
+The data is not the problem: `GET /api/runs` returns every run newest-first with
+no status filter, queued and running included, and the run list already knows how
+to render a live row — `run.status === "running" || "queued"` has its own
+treatment.
+
+The problem is that the Runs tab is the homepage (`/`), and it is a **server
+component with no client-side refresh at all**. It is marked `force-dynamic`, so
+it re-renders per request, but nothing re-requests: there is no polling, no SSE,
+no `router.refresh()`. Two consequences, and a fix should address both:
+
+- **Sitting on the page shows a frozen list.** A run started from the CLI, from
+  CI, or by a colleague never appears, and a running row never advances to
+  completed.
+- **Navigating back to it can show stale data.** Next's App Router caches RSC
+  payloads client-side, so a `<Link>` back to `/` can serve what it rendered
+  earlier rather than refetching — which is the most likely reason a run started
+  seconds ago is missing.
+
+`RunProgress` on the run detail page already does this properly, over SSE, and is
+worth copying rather than reinventing: it advances on observable phase rather than
+a clock, and refreshes the server component once on reaching a terminal state.
+
+**Watch out for:** don't poll `GET /api/runs` every second for every open tab —
+`_summarise()` runs per row. Either extend the existing SSE stream to carry
+run-list events, or poll at a sane interval and only while a run is active.
+
+**Done when:** starting a scan in one tab makes it appear in the Runs tab of
+another without a manual reload, and a completing run updates in place.
+
+---
+
+### `analyzer-plugin` — make a bolt-on analyzer a drop-in container · **L**
+
+Adding a new analyzer should be: write a container that honours the contract,
+declare it, restart. Today it is an edit to at least five files in the core
+repository — `core/sandbox/images.py` (the hardcoded
+`ANALYZERS = ("hello", "static", "unpack")`), the pipeline that names images and
+invokes them, `docker-compose.yml`, the `Makefile`, and `make.ps1` — which means
+nobody outside this repo can add one at all.
+
+The foundations are already right, which is what makes this worth doing rather
+than rewriting. `SandboxSpec` and `SandboxDriver` are analyzer-agnostic. The
+contract is already explicit and already documented by the reference image: read
+from `/input`, work in tmpfs, write one JSON document to `/output/result.json`,
+exit non-zero and explain on stderr, expect no network and no root. Celery queues
+are already split by analyzer class. Evidence records are already normalised, so
+a new analyzer's output joins the existing pipeline without touching the
+correlator.
+
+**Wanted:** an analyzer *manifest* — a small declarative file an analyzer ships
+(name, image, which queue, which artifact types it wants, resource ceilings,
+timeout, whether it is enabled) that the orchestrator discovers rather than
+having compiled in. Plus a documented output schema, so a third-party analyzer's
+evidence is first-class rather than special-cased.
+
+**Watch out for:**
+- **The boundary is not negotiable.** A plugin manifest must not be able to ask
+  for network, the Docker socket, root, or a writable rootfs. `SandboxSpec`
+  already refuses to construct a spec that weakens those; the manifest loader
+  has to refuse just as loudly, and there should be a test that a malicious
+  manifest cannot widen the sandbox.
+- **A third-party analyzer is untrusted code processing an untrusted artifact.**
+  That is fine — it is exactly what the sandbox is for — but its *output* is
+  untrusted too, and it lands in the database and the UI.
+- **Seccomp is per-image in practice.** The allowlist has only been exercised
+  against a slim Python image; a JVM or Wine-based analyzer will need additions.
+  The manifest may need to carry a profile reference, without letting a plugin
+  simply turn seccomp off.
+- Versioning: the run manifest records tool versions for reproducibility, and a
+  plugin's version has to land there too or two runs stop being comparable.
+
+**Ghidra is the proving case.** If the plugin interface is right, the `ghidra`
+bounty becomes "write a Ghidra analyzer image and a manifest" rather than
+"modify the orchestrator". Worth building these two together, in that order:
+design the interface against Ghidra's real requirements — several GB of memory,
+long runtimes, a JVM — rather than against the three small Python analyzers that
+already exist and agree with each other.
+
+---
+
+### `re-view` — a reverse-engineering view, not just findings · **M**
+
+Findings answer "what is wrong with this artifact". They do not answer **"what
+is this artifact, and how does it work"** — which is the question an analyst
+actually starts with, and often the reason they opened the tool.
+
+Wanted: a separate tab alongside Findings that describes the software rather
+than its defects. What it is built with, what it talks to, what it does on
+startup, which components it bundles, what capabilities it appears to have.
+
+**A surprising amount of this is already computed and thrown away:**
+
+- **Recon inventory** (`core/rules/recon.py`) sweeps what *kinds* of thing are in
+  an artifact — independently of the rule pack, explicitly "never a finding". It
+  is stored on `RunManifest.recon` as JSON and **exposed by no endpoint at all**.
+  It is the closest thing to a "what is this" summary that already exists.
+- **Component inventory** (`core/composition`) — the bundled libraries with
+  ecosystems, versions, licences, and where in the unpack tree each was found.
+  Reachable today only as a CycloneDX download.
+- **The artifact tree** — the full recursive unpack structure, already rendered
+  on the run page.
+
+So a first slice is mostly *surfacing*: give recon an endpoint, put it and the
+component inventory behind a tab, and the view is already more than nothing
+without any new analysis.
+
+Beyond that it wants real analysis, and that is where it meets the two bounties
+above: imports and linked libraries, entry points, embedded URLs and endpoints
+grouped by host, and — once Ghidra lands — a function-level view and the
+cross-references that show whether a hardcoded credential is actually reachable.
+
+**Watch out for:**
+- **Do not let this become findings by another name.** Recon is deliberately not
+  a finding, and presenting "this binary makes network calls" with severity
+  colouring would undo that distinction. It is description, not judgement.
+- The LLM layer is a natural fit for narrating "how it works" — and the rule
+  that it may never create a finding still holds. A narrative is advisory, has
+  to be labelled as model-generated, and must not be required: `--no-llm` still
+  has to produce this view from the deterministic inventory.
+- §9 applies. Describing how software works is not the same as producing an
+  exploit, and this view must not drift toward "how to defeat it".
+
+**Done when:** opening a scanned installer shows, without reading a single
+finding, what it is built with, what it bundles, and what it appears to reach
+out to.
 
 ---
 

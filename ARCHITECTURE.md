@@ -282,6 +282,9 @@ not adopt the tool.
 
 `docker compose` is the reference deployment; a Helm chart lands in M6.
 
+[docs/CONTAINERS.md](docs/CONTAINERS.md) covers each container in operational
+detail — healthchecks, failure modes, state, and which ones hold privilege.
+
 | Service | Role |
 | --- | --- |
 | `api` | FastAPI. No Docker socket — it does not spawn containers |
