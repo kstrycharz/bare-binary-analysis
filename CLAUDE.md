@@ -16,9 +16,10 @@ the ADR log.
 
 ## 1. Project overview
 
-BARE is a self-hosted, air-gap-capable analysis platform for the binaries
-a company is about to ship — installers, executables, DLLs, firmware images,
-ELF binaries, embedded-device update bundles. It detonates them inside
+BARE (Binary Analysis & Reverse Engineering) is a self-hosted,
+air-gap-capable analysis platform for the binaries a company is about to
+ship — installers, executables, DLLs, firmware images, ELF binaries,
+embedded-device update bundles. It detonates them inside
 disposable Docker sandboxes, reverse engineers them with standard open-source
 tooling, and reports on secrets exposure, sensitive data leakage, and
 unintended IP disclosure before the artifact reaches a customer. It fills the

@@ -1,30 +1,44 @@
 # BARE
 
-**Scan the artifacts you are about to ship.**
+*Binary Analysis & Reverse Engineering*
+
+**A self-hosted platform that reverse engineers the binaries you are about to
+ship, and reports what they give away.**
+
+Point it at an installer, executable, DLL, firmware image, or update bundle.
+BARE unpacks the artifact recursively inside a disposable Docker sandbox with
+no network, reverse engineers what comes out, and reports the credentials,
+internal hostnames, build paths, and third-party components compiled into the
+thing your customer actually receives. Run it as a dashboard, or as a CI stage
+gate that fails the build with a meaningful exit code.
 
 Everyone scans their source code. Almost nobody looks at the binary that comes
-out the other end — and the build pipeline leaks. CI environment variables get
-baked into strings tables. Debug builds ship PDB paths that expose internal
-directory trees, developer usernames, and unreleased project codenames.
-Embedded vendors hardcode provisioning credentials and update-server API keys
-because the device has no other way to bootstrap. An installer bundles a
-`config.default.json` with a real staging token in it.
+out the other end — and the build pipeline is where the leak happens. CI
+environment variables get baked into strings tables. Debug builds ship PDB
+paths exposing internal directory trees and developer usernames. An installer
+bundles a `config.default.json` with a real staging token in it.
 
-BARE takes the installers, executables, firmware images, and update
-bundles you are about to release, unpacks them inside disposable sandboxes, and
-reverse engineers them with standard open-source tooling to answer two
-questions about the thing you are actually shipping:
+**Every finding is produced by a deterministic rule.** The optional LLM layer
+triages, explains, and investigates on top of that spine — it never invents a
+finding, and the entire pipeline runs without it. Self-hosted and air-gap
+capable: your artifacts never leave your network.
 
-**What does it leak?** Secrets exposure, sensitive data, and unintended IP
-disclosure — credentials baked into strings tables, internal hostnames, build
-paths naming your directory tree and your developers.
+## Under the hood
 
-**What is it made of?** Binary composition analysis: the third-party components
-bundled inside, identified by Package URL and emitted as a CycloneDX SBOM. A
-release record that says what leaked but not what is in the box is half a
-document.
+| Stage | What does the work |
+| --- | --- |
+| **Isolation** | Docker, one disposable container per analyzer — seccomp allowlist, no network, no DNS, read-only rootfs, all capabilities dropped, non-root, tmpfs scratch, plus a watchdog and a reaper |
+| **Unpacking** | `p7zip` (7z, ZIP, CAB, MSI, ISO, NSIS, InnoSetup), `squashfs-tools`, `cabextract` — recursive, magic-byte container detection, hard cumulative budgets as the zip-bomb defence |
+| **String extraction** | Printable-run extractor over ASCII and UTF-16LE, parallelised across the container's CPU quota |
+| **Detection** | YAML rule packs — id, severity, CWE, remediation, and required pass/fail fixtures — matched with Shannon-entropy floors and per-rule exclusion lists |
+| **Recon sweep** | A deliberately over-broad inventory pass (every URI scheme, UNC path, hostname, UPN) to surface what nobody wrote a rule for |
+| **Composition** | Components read from embedded `package.json`, `.dist-info/METADATA`, `.nuspec`, and Go build info → Package URL → CycloneDX SBOM |
+| **Orchestration** | FastAPI, Celery on Redis, PostgreSQL, MinIO, Next.js dashboard |
+| **Reporting** | SARIF 2.1.0, CycloneDX 1.5, PDF release record, JSON |
+| **AI layer** *(optional)* | LiteLLM for hosted providers, Ollama for local — triage, explanation, and bounded agentic investigation with read-only tools |
 
-It is self-hosted and air-gap capable. Your artifacts do not leave your network.
+Ghidra-backed cross-referencing and dynamic (detonation) analysis are designed
+and not yet built — see [Status](#status).
 
 ---
 
