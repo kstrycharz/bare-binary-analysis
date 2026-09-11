@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.compose import compose_service
+from tests.compose import COMPOSE_PATH, compose_service
 
 # Everything that runs indefinitely. One-shot services (the analyzer builds,
 # minio-init) exit immediately and are excluded on purpose.
@@ -93,3 +93,19 @@ class TestItRestartsUnlessStopped:
     @pytest.mark.parametrize("name", LONG_LIVED)
     def test_it_comes_back_after_a_crash(self, name: str) -> None:
         assert "restart: unless-stopped" in compose_service(name)
+
+
+class TestTheStackBootsWithoutAnEnvFile:
+    def test_the_minio_default_password_meets_its_floor(self) -> None:
+        """MinIO refuses to start when MINIO_ROOT_PASSWORD is under 8
+        characters, and the compose default is what a fresh clone boots with.
+        The project-name default was exactly 4 after the BARE rename, so every
+        clean `docker compose up` crash-looped minio and the API never came up.
+        Keep the default (and any future rename of it) at least 8 characters."""
+        import re
+
+        text = COMPOSE_PATH.read_text(encoding="utf-8")
+        defaults = re.findall(r"\$\{MINIO_ROOT_PASSWORD:-(.*?)\}", text)
+        assert defaults, "no ${MINIO_ROOT_PASSWORD:-...} default in compose"
+        for value in defaults:
+            assert len(value) >= 8, f"compose default {value!r} is under MinIO's 8-char floor"
