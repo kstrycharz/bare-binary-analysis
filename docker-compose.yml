@@ -324,15 +324,30 @@ services:
       - core.orchestrator.celery_app:celery_app
       - beat
       - --loglevel=info
+    volumes:
+      # Not strictly required for the heartbeat (the healthcheck process runs
+      # inside this container, so any writable path works) — mounted for
+      # consistency with the sibling backend services, and so a `restart`
+      # that preserves the volume does not lose the first tick's timestamp.
+      - backend-data:/app/data
+    healthcheck:
+      # Beat answers no `inspect ping` — it is not a worker node — so this
+      # reads the scheduler's own tick heartbeat instead: fresh means the
+      # loop is running, stale means wedged. See core/orchestrator/beat_health.
+      test: ["CMD", "python", "-m", "core.orchestrator.beat_health"]
+      interval: 30s
+      timeout: 10s
+      retries: 2
+      # One grace window's worth: a first container start schedules the
+      # volume, copies the default config, and ticks — none of which should
+      # read as unhealthy yet.
+      start_period: 90s
     depends_on:
       redis:
         condition: service_healthy
       # Beat's scheduled tasks (the reaper) read the runs table.
       api:
         condition: service_healthy
-    # No healthcheck: beat answers no `inspect ping`, and the slim base image
-    # has no pgrep to fake one with. A wedged beat is still only visible in
-    # logs; inventing a check that cannot fail would be worse than saying so.
     <<: *logging
     restart: unless-stopped
 

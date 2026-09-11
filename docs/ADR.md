@@ -878,3 +878,72 @@ wrote the findings", which is the sentence an auditor needs.
 rule-pack scan of 512 KiB, a future read path can forget to do it, and the
 unredacted bytes sit in the bucket anyway. Redact once, at the only moment
 all the context (which pack ran) is unambiguous.
+
+---
+
+## ADR-0033 — Beat's healthcheck is its own scheduler tick, written to a file and read by age
+
+**Date:** 2026-09-11
+**Status:** Accepted
+
+### Context
+
+Both worker lanes answer `celery inspect ping` to their own node (ADR-0029);
+beat cannot — it is not a worker, it holds no node, and the slim base image
+has no `pgrep` to approximate a process check with. A wedged beat — the loop
+blocked on a broker write, say — was visible only by reading its logs, carried
+in CLAUDE.md §6 as debt and named as a bounty (`beat-healthcheck`). The
+compose file said so honestly in a comment rather than running a check that
+could not fail.
+
+### Decision
+
+Make beat sign for itself. `HeartbeatScheduler` (subclassing
+`PersistentScheduler`, configured via `beat_scheduler` in the Celery app)
+touches `/app/data/beat/heartbeat` every time its `tick()` returns. The
+compose healthcheck is `python -m core.orchestrator.beat_health`, which fails
+when the file is older than `4 × 30 s`.
+
+The interval is load-bearing and was measured, not assumed: the tick loop
+sleeps at most `Scheduler.max_interval`, which Celery derives from the
+nearest schedule entry *or* `beat_max_loop_interval`, whichever is smaller.
+With only 2-minute and 5-minute sweeps configured, stock beat on the real
+image wakes at `maxinterval -> 5.00 minutes` and leaves the schedule file
+untouched (verified: three `stat`s across 14 s, unchanged mtime). Pinning
+`beat_max_loop_interval = 30` gives the heartbeat its own 30-second rhythm
+even when nothing is due; the 120 s grace tolerates four missed ticks.
+
+The heartbeat rides the existing `backend-data` volume for consistency with
+the sibling backend services — strictly, both the scheduler loop and the
+healthcheck process run inside this one container, so any writable path is
+the whole channel. `tick()` is called immediately at loop start — read from
+`Service.start` — so the file exists from the first second of a start, and
+the 90 s `start_period` covers the rest.
+
+**Scope honesty:** this measures liveness of the loop, not correctness of
+scheduling. A beat that ticks while its broker writes silently fail passes
+the check; that failure is visible where it belongs — queued work not
+arriving — and a check that also probed Redis would just be `/readyz`
+wearing a cape.
+
+### Alternatives rejected
+
+**`pgrep celery`-style process checks.** The base image has no pgrep; adding
+procps to every backend image for one check widens the attack surface of an
+image that exists to talk to Postgres, and a process listing proves only
+that the process was forked, not that its loop turns. A wedged process looks
+exactly like a healthy one there, which is precisely the failure this bounty
+names.
+
+**`celery -A ... beat --scheduler` with no subclass + file mtime of the
+schedule DB.** Tempting and wrong: shelve writes the DB only when the heap
+changes, not each tick — measured above, the file's mtime sat unchanged for
+the whole idle window.
+
+**Heartbeat into Redis.** A separate key per service with a TTL would work
+and costs a broker dependency for a question the filesystem answers; it also
+would not distinguish "beat wedged" from "Redis unreachable from beat",
+which is the wrong diagnostic.
+
+**Extending the worker healthcheck to cover beat.** Different failure
+domains; ADR-0029's point is that each container's check reports on itself.

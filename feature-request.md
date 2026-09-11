@@ -362,12 +362,23 @@ out to.
 
 Smaller or more speculative. Same process.
 
-### `beat-healthcheck` — a liveness check for the scheduler · **S**
+### ~~`beat-healthcheck`~~ — a liveness check for the scheduler · **S** · **DONE**
+
+Delivered as `HeartbeatScheduler` (a tick touch on the existing
+`backend-data` volume) plus `python -m core.orchestrator.beat_health` reading
+its age (ADR-0033). `beat_max_loop_interval` is pinned to 30s because stock
+beat idles with a five-minute tick.
+
+<details>
+<summary>Original bounty</summary>
+
 Both worker lanes have healthchecks (ADR-0029). `beat` does not, because it
 answers no `celery inspect ping` and the base image has no `pgrep`. A wedged
 scheduler is currently only visible in logs. Probably a heartbeat file plus a
 check that reads its mtime. **Good first bounty** — self-contained, and there is
 a worked example to copy in `core/orchestrator/health.py`.
+
+</details>
 
 ### `waive` — `bare waive <id>` · **S**
 CI prints finding ids; turning one into a waiver means hand-editing YAML, which
