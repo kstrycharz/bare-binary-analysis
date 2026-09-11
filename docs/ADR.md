@@ -795,3 +795,63 @@ two unhealthy providers nobody asked for. Inert beats plausible-but-wrong.
 **Cache the probe results.** The page's own text says a stale green tick is
 worse than none, and that is right: "test connection" is the question being
 asked. Making the probe fast is the fix; making it rare is an evasion.
+
+---
+
+## ADR-0031 — The Runs list refreshes on a fingerprint event, not on polling the list
+
+**Date:** 2026-09-11
+**Status:** Accepted
+
+### Context
+
+The Runs tab is the homepage, a `force-dynamic` server component with no
+client-side refresh. Two failure modes followed (bounty: `runs-live`): sitting
+on the page, a run started from the CLI or CI never appeared and a running row
+never advanced; and navigating *back* to the page could serve the RSC payload
+App Router cached on the client, because a client-side navigation makes no
+request for a `force-dynamic` page to be dynamic about.
+
+The obvious fix — poll `GET /api/runs` — has a cost the bounty called out by
+name: `_summarise()` runs four queries per row, per poll, per open tab. On a
+deployment with a few hundred runs and a few dashboards, the list endpoint
+becomes the busiest thing in the API for no information nobody was reading.
+
+### Decision
+
+`GET /api/runs/events`, one SSE stream per tab, polls *only*
+`SELECT id, status FROM runs ORDER BY created_at DESC, id LIMIT 200` — one
+indexed query, unchanged or changed — and emits a frame only when that
+fingerprint differs from the last. The frame carries `{changed, runs}`: no
+names, no severities, no findings. Any change to the list as the dashboard sees
+it — a new run, a status transition, a deletion — is one frame; the client
+coalesces frames through a 400 ms quiet period into one `router.refresh()`.
+
+The data path stays single-sourced: the event says *"the server-rendered list
+you hold can no longer be true"*, and the refresh re-runs the server component
+over the authenticated, redacted, scoped API. The stream is a wake-up signal,
+not a second truth, which is why it is allowed to be this cheap and this
+unauthenticated-by-content.
+
+Client behaviour that covers the second failure mode: the wrapper issues one
+coalesced refresh on mount (a cached-RSC back-navigation re-fetches once, the
+same round-trip a hard reload already pays) and re-opens the stream plus one
+refresh whenever the tab becomes visible again — hidden tabs hold no poller,
+and "it finished while I was away" should be true on return.
+
+### Alternatives rejected
+
+**Poll `GET /api/runs` on an interval.** Four queries per row per tab per tick
+for the answer "probably nothing changed." The bounty itself calls this out.
+
+**Extend the per-run `/events` stream.** A dashboard tab does not know every
+run id — the page's whole problem is runs it has never seen. A multiplexed
+per-run fan-out stream is a different, heavier object than a list fingerprint.
+
+**Push from the write path (worker/API emits on status change).** Truly event-
+driven, but every path that mutates `runs` — worker, beat's reaper, the CLI
+creating a run, a cancellation — would have to remember to publish, through
+Redis, and any missed one is a frozen tab with no way to notice. A two-second
+fingerprint poll cannot miss, because it reads the truth rather than trusting
+someone to have announced it. The cost the rejected poll had (per-row work) is
+exactly what this design removes.

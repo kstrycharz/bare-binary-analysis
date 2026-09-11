@@ -15,6 +15,7 @@
 import Link from "next/link";
 import { api, type RunSummary, type Severity } from "@/lib/api";
 import { Button, SeverityBar, bytes, relativeTime } from "@/components/ui";
+import { RunsLive } from "@/components/runs-live";
 
 export const dynamic = "force-dynamic";
 
@@ -86,47 +87,51 @@ export default async function OverviewPage() {
 
   return (
     <div className="space-y-7">
-      {error && (
-        <div className="rounded-lg border border-critical/40 bg-critical-bg px-5 py-4">
-          <p className="text-[13px] font-semibold text-critical">API unreachable</p>
-          <p className="mt-1 break-words font-mono text-[11.5px] text-content-muted">{error}</p>
+      <RunsLive>
+        <div className="space-y-7">
+          {error && (
+            <div className="rounded-lg border border-critical/40 bg-critical-bg px-5 py-4">
+              <p className="text-[13px] font-semibold text-critical">API unreachable</p>
+              <p className="mt-1 break-words font-mono text-[11.5px] text-content-muted">{error}</p>
+            </div>
+          )}
+
+          {!error && runs.length === 0 && <FirstRun />}
+
+          {latest && (
+            <>
+              {/* The fold. One verdict, at a size that carries. */}
+              <Verdict run={latest} blocking={blocking} counts={latestCounts} />
+
+              {/* Fleet numbers on a single rule — a row of equals, because none of
+                  them outranks another. */}
+              <section className="surface-panel grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+                <Stat
+                  label="Would block a release"
+                  value={fleetBlocking}
+                  tone={fleetBlocking > 0 ? "critical" : "ok"}
+                  hint={`across ${current.length} artifact${current.length === 1 ? "" : "s"}`}
+                />
+                <Stat
+                  label="Introduced by a build"
+                  value={newThisBuild}
+                  tone={newThisBuild > 0 ? "high" : "ok"}
+                  hint="what the gate fails on"
+                />
+                <Stat label="Open findings" value={fleetTotal} hint="current build of each" />
+                <Stat
+                  label="Files analysed"
+                  value={filesAnalysed}
+                  hint={degraded > 0 ? `${degraded} run(s) failed` : "unpacked recursively"}
+                  tone={degraded > 0 ? "high" : "neutral"}
+                />
+              </section>
+
+              <RunLog runs={runs} />
+            </>
+          )}
         </div>
-      )}
-
-      {!error && runs.length === 0 && <FirstRun />}
-
-      {latest && (
-        <>
-          {/* The fold. One verdict, at a size that carries. */}
-          <Verdict run={latest} blocking={blocking} counts={latestCounts} />
-
-          {/* Fleet numbers on a single rule — a row of equals, because none of
-              them outranks another. */}
-          <section className="surface-panel grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
-            <Stat
-              label="Would block a release"
-              value={fleetBlocking}
-              tone={fleetBlocking > 0 ? "critical" : "ok"}
-              hint={`across ${current.length} artifact${current.length === 1 ? "" : "s"}`}
-            />
-            <Stat
-              label="Introduced by a build"
-              value={newThisBuild}
-              tone={newThisBuild > 0 ? "high" : "ok"}
-              hint="what the gate fails on"
-            />
-            <Stat label="Open findings" value={fleetTotal} hint="current build of each" />
-            <Stat
-              label="Files analysed"
-              value={filesAnalysed}
-              hint={degraded > 0 ? `${degraded} run(s) failed` : "unpacked recursively"}
-              tone={degraded > 0 ? "high" : "neutral"}
-            />
-          </section>
-
-          <RunLog runs={runs} />
-        </>
-      )}
+      </RunsLive>
     </div>
   );
 }
