@@ -162,7 +162,10 @@ proves the profile actually applied:
 make sandbox-check           # ./make.ps1 sandbox-check on Windows
 ```
 
-See [CLAUDE.md](CLAUDE.md) for current status, known issues, and what is next.
+See [CLAUDE.md](CLAUDE.md) for current status, known issues, and what is next,
+and [feature-request.md](feature-request.md) for the bounty list — wanted
+features, each scoped so it can be built on a branch and judged on whether it
+works.
 
 ## Quick start
 

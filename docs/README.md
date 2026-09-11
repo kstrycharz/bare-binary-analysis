@@ -11,3 +11,7 @@ points:
 `CLAUDE.md` is the working document: current status, known issues, and the
 conventions the code is held to. `ADR.md` records architecture decisions with
 their rejected alternatives.
+
+`feature-request.md` in the repository root is the bounty list: wanted features,
+each scoped so someone can build it on a branch and have it judged on whether it
+works. Start there if you are looking for something to pick up.
