@@ -20,7 +20,7 @@ _RULE = "-" * 72
 
 
 def render_text(verdict: GateVerdict, *, artifact: str = "", run_url: str = "") -> str:
-    headline = f"  SIGHTGLASS RELEASE GATE — {verdict.decision.value.upper()}"
+    headline = f"  BARE RELEASE GATE — {verdict.decision.value.upper()}"
     lines: list[str] = [_RULE, headline, _RULE]
 
     if artifact:
@@ -96,7 +96,7 @@ def _next_step(verdict: GateVerdict) -> str:
     return (
         "Remove the value from the artifact and rotate it if it is live. "
         "If it is genuinely benign, add a time-boxed waiver to "
-        ".sightglass/waivers.yaml with an owner and a reason."
+        ".bare/waivers.yaml with an owner and a reason."
     )
 
 
@@ -157,7 +157,7 @@ def render_markdown(verdict: GateVerdict, *, artifact: str = "", run_url: str = 
         GateDecision.INCONCLUSIVE: "⚠️",
     }[verdict.decision]
 
-    lines = [f"## {icon} Sightglass release gate — {verdict.decision.value}", ""]
+    lines = [f"## {icon} BARE release gate — {verdict.decision.value}", ""]
     if artifact:
         lines.append(f"**Artifact:** `{artifact}`  ")
     lines.append(f"**Policy:** `{verdict.policy_name}`  ")

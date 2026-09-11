@@ -121,7 +121,7 @@ class RunManifest(Base, TimestampMixin):
         String(36), ForeignKey("runs.id", ondelete="CASCADE"), unique=True, index=True
     )
 
-    sightglass_version: Mapped[str] = mapped_column(String(32))
+    bare_version: Mapped[str] = mapped_column(String(32))
     artifact_sha256: Mapped[str] = mapped_column(String(64))
     rule_pack_version: Mapped[str] = mapped_column(String(32))
     rule_pack_hash: Mapped[str] = mapped_column(String(64))
@@ -155,7 +155,7 @@ class RunManifest(Base, TimestampMixin):
         """One hash over the whole manifest. Two runs sharing this must produce
         identical findings; the determinism test asserts exactly that."""
         parts = [
-            self.sightglass_version,
+            self.bare_version,
             self.artifact_sha256,
             self.rule_pack_version,
             self.rule_pack_hash,
@@ -487,7 +487,7 @@ class AuditLog(Base, TimestampMixin):
 
 class Suppression(Base, TimestampMixin):
     """Keyed on value hash + rule + path pattern, and portable across runs via
-    a checked-in ``.sightglass-ignore.yaml``.
+    a checked-in ``.bare-ignore.yaml``.
 
     If a user cannot suppress a known-benign finding once and have it stay
     suppressed, they stop using the tool by week three.

@@ -107,8 +107,8 @@ class TestCreateKwargs:
 
     def test_reaper_labels_are_attached(self, driver: DockerDriver, run_root: Path) -> None:
         kwargs = driver._build_create_kwargs(make_spec(run_root))
-        assert kwargs["labels"]["sightglass.managed"] == "true"
-        assert kwargs["labels"]["sightglass.run"] == "run-1"
+        assert kwargs["labels"]["bare.managed"] == "true"
+        assert kwargs["labels"]["bare.run"] == "run-1"
 
     def test_sinkhole_networking_raises_rather_than_falling_back(
         self, driver: DockerDriver, run_root: Path
@@ -159,11 +159,11 @@ class TestHostPathTranslation:
         driver = DockerDriver(
             run_root=run_root,
             repo_root=repo_root,
-            host_run_root="/srv/sightglass/runs",
+            host_run_root="/srv/bare/runs",
             client=object(),
         )
         translated = driver._to_host_path(str(run_root / "run-1" / "staging"))
-        assert translated == "/srv/sightglass/runs/run-1/staging"
+        assert translated == "/srv/bare/runs/run-1/staging"
 
     def test_translates_onto_a_windows_host_root_from_a_linux_worker(
         self, run_root: Path, repo_root: Path
@@ -174,11 +174,11 @@ class TestHostPathTranslation:
         driver = DockerDriver(
             run_root=run_root,
             repo_root=repo_root,
-            host_run_root=r"C:\sightglass\runs",
+            host_run_root=r"C:\bare\runs",
             client=object(),
         )
         translated = driver._to_host_path(str(run_root / "run-1" / "results"))
-        assert translated == r"C:\sightglass\runs\run-1\results"
+        assert translated == r"C:\bare\runs\run-1\results"
 
     def test_translation_is_applied_to_the_create_request(
         self, run_root: Path, repo_root: Path

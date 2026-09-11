@@ -44,7 +44,7 @@ mirrors every Makefile target.
 ## 2. Get the code and configure
 
 ```bash
-git clone <your-remote> sightglass && cd sightglass
+git clone <your-remote> bare && cd bare
 ```
 
 ```bash
@@ -55,20 +55,20 @@ Now open `.env` and set **one** variable. This is the only setting that
 commonly goes wrong, so it is worth understanding rather than pasting:
 
 ```bash
-SIGHTGLASS_RUN_ROOT_HOST=/var/lib/sightglass/runs
+BARE_RUN_ROOT_HOST=/var/lib/bare/runs
 ```
 
 On Windows use a Windows path:
 
 ```bash
-SIGHTGLASS_RUN_ROOT_HOST=C:\sightglass\runs
+BARE_RUN_ROOT_HOST=C:\bare\runs
 ```
 
 **Why this exists.** The worker spawns each analyzer as a *sibling* container
 through the host's Docker socket. When it asks the daemon to bind-mount a
 directory, the daemon resolves that path **on the host**, not inside the
-worker. So there are two views of one directory: `SIGHTGLASS_RUN_ROOT_HOST`
-(what the daemon sees) and `/var/lib/sightglass/runs` (what the worker sees).
+worker. So there are two views of one directory: `BARE_RUN_ROOT_HOST`
+(what the daemon sees) and `/var/lib/bare/runs` (what the worker sees).
 The driver translates between them.
 
 Get it wrong and analyzers receive empty input directories with no error at
@@ -78,7 +78,7 @@ why this is step two rather than a footnote.
 Create the directory:
 
 ```bash
-mkdir -p /var/lib/sightglass/runs
+mkdir -p /var/lib/bare/runs
 ```
 
 Install Python dependencies:
@@ -91,7 +91,7 @@ make install
 <summary>Windows</summary>
 
 ```powershell
-New-Item -ItemType Directory -Force -Path C:\sightglass\runs
+New-Item -ItemType Directory -Force -Path C:\bare\runs
 ./make.ps1 install
 ```
 </details>
@@ -106,9 +106,9 @@ make images
 
 This builds three analyzer images:
 
-- `sightglass/hello:dev` — the reference analyzer and isolation probe
-- `sightglass/static:dev` — string extraction, rule matching, entropy, file ID
-- `sightglass/unpack:dev` — recursive unpacking of nested containers
+- `bare/hello:dev` — the reference analyzer and isolation probe
+- `bare/static:dev` — string extraction, rule matching, entropy, file ID
+- `bare/unpack:dev` — recursive unpacking of nested containers
 
 You can skip this step: they are Compose services (ADR-0028), so `make dev`
 below builds them along with everything else. Run it on its own when you want
@@ -124,7 +124,7 @@ First build takes a few minutes. Subsequent builds are cached.
 ### Tagging the images
 
 `dev` is the default and needs no configuration. For anything you deploy rather
-than develop against, set a real tag — `SIGHTGLASS_ANALYZER_TAG` is read by both
+than develop against, set a real tag — `BARE_ANALYZER_TAG` is read by both
 the build and the orchestrator that runs the containers, so the two cannot
 disagree about which image they mean.
 
@@ -133,7 +133,7 @@ disagree about which image they mean.
 make images
 
 # Production / remote box
-export SIGHTGLASS_ANALYZER_TAG=latest   # or 0.1.0, or a git sha
+export BARE_ANALYZER_TAG=latest   # or 0.1.0, or a git sha
 make images
 docker compose up -d
 ```
@@ -142,7 +142,7 @@ docker compose up -d
 <summary>Windows</summary>
 
 ```powershell
-$env:SIGHTGLASS_ANALYZER_TAG = 'latest'
+$env:BARE_ANALYZER_TAG = 'latest'
 ./make.ps1 images
 docker compose up -d
 ```
@@ -152,11 +152,11 @@ Put it in `.env` to make it stick for `docker compose`, the same way the run
 root is set.
 
 For a single analyzer — pinning a digest, or pulling one image from a different
-registry — `SIGHTGLASS_STATIC_IMAGE`, `SIGHTGLASS_UNPACK_IMAGE`, and
-`SIGHTGLASS_HELLO_IMAGE` take a complete reference and win over the tag:
+registry — `BARE_STATIC_IMAGE`, `BARE_UNPACK_IMAGE`, and
+`BARE_HELLO_IMAGE` take a complete reference and win over the tag:
 
 ```bash
-export SIGHTGLASS_STATIC_IMAGE=registry.internal/sightglass/static@sha256:...
+export BARE_STATIC_IMAGE=registry.internal/bare/static@sha256:...
 ```
 
 ---
@@ -182,7 +182,7 @@ You want `"ready": true`. The `advisory.sandbox` entry reporting unhealthy is
 containers is the worker's job. It is reported but does not gate readiness.
 
 Open <http://localhost:3000>. The API requires a bearer token by default
-(`SIGHTGLASS_AUTH_REQUIRED=true`), and a fresh deployment has none yet — the
+(`BARE_AUTH_REQUIRED=true`), and a fresh deployment has none yet — the
 dashboard notices and opens a one-time setup wizard instead of the runs list.
 Click through it: it mints the first admin token and saves it for the
 dashboard's own use immediately, no `.env` edit or restart required. A
@@ -369,7 +369,7 @@ a plausible reason — the synthetic corpus embeds a "THIS IS SYNTHETIC TEST DAT
 marker — but on a real artifact that would be wrong in the most expensive
 possible direction.
 
-Here is what Sightglass did with that verdict:
+Here is what BARE did with that verdict:
 
 | Finding | Severity | AI verdict | Actual status |
 | --- | --- | --- | --- |
@@ -444,7 +444,7 @@ party's artifact for due diligence, read [SECURITY.md](../SECURITY.md) first —
 whether that is lawful depends on the licence, your jurisdiction, and how you
 obtained the file.
 
-### If Sightglass finds something
+### If BARE finds something
 
 **Rotate the credential.** Do not merely remove it from the next build. The
 version that already shipped is still out there, and the finding is evidence it
@@ -456,11 +456,11 @@ was exposed.
 
 ### The scan completes but finds nothing in an artifact you know is dirty
 
-Almost always `SIGHTGLASS_RUN_ROOT_HOST`. The analyzer got an empty `/input`.
+Almost always `BARE_RUN_ROOT_HOST`. The analyzer got an empty `/input`.
 
 ```bash
-docker compose exec worker printenv SIGHTGLASS_RUN_ROOT_HOST
-ls -la /var/lib/sightglass/runs
+docker compose exec worker printenv BARE_RUN_ROOT_HOST
+ls -la /var/lib/bare/runs
 ```
 
 The path must exist **on the host** and match what the worker reports.
@@ -468,7 +468,7 @@ The path must exist **on the host** and match what the worker reports.
 ### `make dev` fails with "mount denied ... too many colons"
 
 A Windows path is being used where a container path is expected. Ensure you set
-`SIGHTGLASS_RUN_ROOT_HOST` (the host path) and not `SIGHTGLASS_RUN_ROOT`.
+`BARE_RUN_ROOT_HOST` (the host path) and not `BARE_RUN_ROOT`.
 
 ### Triage says "the LLM layer is disabled in config/llm.yaml"
 

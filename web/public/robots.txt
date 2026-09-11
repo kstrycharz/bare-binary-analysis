@@ -1,4 +1,4 @@
-# Sightglass is a self-hosted internal tool. Nothing here should ever be
+# BARE is a self-hosted internal tool. Nothing here should ever be
 # indexed — a findings page is a list of a company's exposed secrets.
 User-agent: *
 Disallow: /

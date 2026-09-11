@@ -12,7 +12,7 @@ concurrency:
 env:
   # The CI default is deterministic-only (§2.5). No job here may configure an
   # LLM: the release gate must work when a customer's model is down.
-  SIGHTGLASS_EGRESS_POLICY: deny
+  BARE_EGRESS_POLICY: deny
 
 jobs:
   lint:
@@ -53,7 +53,7 @@ jobs:
       - run: uv sync --extra dev
 
       - name: Build analyzer images
-        run: make image-hello   # tag follows SIGHTGLASS_ANALYZER_TAG, default dev
+        run: make image-hello   # tag follows BARE_ANALYZER_TAG, default dev
 
       # These are the tests that decide whether anything else in this repo can
       # be trusted, so they get their own job and a visible name.
@@ -62,10 +62,10 @@ jobs:
 
       - name: M0 acceptance — probe through the real sandbox
         run: |
-          sudo mkdir -p /var/lib/sightglass/runs
-          sudo chmod 0777 /var/lib/sightglass/runs
-          SIGHTGLASS_RUN_ROOT=/var/lib/sightglass/runs uv run sightglass sandbox health
-          SIGHTGLASS_RUN_ROOT=/var/lib/sightglass/runs uv run sightglass sandbox hello
+          sudo mkdir -p /var/lib/bare/runs
+          sudo chmod 0777 /var/lib/bare/runs
+          BARE_RUN_ROOT=/var/lib/bare/runs uv run bare sandbox health
+          BARE_RUN_ROOT=/var/lib/bare/runs uv run bare sandbox hello
 
   secrets:
     name: Secret scan
@@ -104,7 +104,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Boot the reference stack and wait for readiness
         run: |
-          sudo mkdir -p /var/lib/sightglass/runs && sudo chmod 0777 /var/lib/sightglass/runs
+          sudo mkdir -p /var/lib/bare/runs && sudo chmod 0777 /var/lib/bare/runs
           docker compose up -d --build postgres redis minio minio-init api
           for _ in $(seq 1 60); do
             if curl -fsS http://localhost:8000/healthz; then break; fi

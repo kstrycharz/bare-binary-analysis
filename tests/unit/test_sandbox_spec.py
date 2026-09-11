@@ -46,9 +46,9 @@ class TestDefaults:
 
     def test_labels_let_the_reaper_find_it(self) -> None:
         labels = make_spec().labels
-        assert labels["sightglass.run"] == "run-1"
-        assert labels["sightglass.analyzer"] == "hello"
-        assert labels["sightglass.managed"] == "true"
+        assert labels["bare.run"] == "run-1"
+        assert labels["bare.analyzer"] == "hello"
+        assert labels["bare.managed"] == "true"
 
     def test_spec_is_hashable_so_it_can_go_in_a_manifest(self) -> None:
         assert hash(make_spec()) == hash(make_spec())

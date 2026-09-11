@@ -266,7 +266,7 @@ def upgrade() -> None:
         "run_manifests",
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("run_id", sa.String(length=36), nullable=False),
-        sa.Column("sightglass_version", sa.String(length=32), nullable=False),
+        sa.Column("bare_version", sa.String(length=32), nullable=False),
         sa.Column("artifact_sha256", sa.String(length=64), nullable=False),
         sa.Column("rule_pack_version", sa.String(length=32), nullable=False),
         sa.Column("rule_pack_hash", sa.String(length=64), nullable=False),

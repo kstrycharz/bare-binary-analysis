@@ -1197,7 +1197,7 @@ wheels = [
 ]
 
 [[package]]
-name = "sightglass"
+name = "bare"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [

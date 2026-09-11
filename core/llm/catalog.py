@@ -11,7 +11,7 @@ rest.
 
 Model defaults are chosen for the `triage` role, which runs thousands of times
 per scan: small, fast, cheap, non-reasoning. A reasoning model here is the
-single most common way to make Sightglass look broken — it spends its whole
+single most common way to make BARE look broken — it spends its whole
 token budget deliberating and returns nothing.
 """
 

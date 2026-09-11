@@ -45,7 +45,7 @@ ADMIN_ROUTES: list[tuple[str, str]] = [
 
 @pytest.fixture(autouse=True)
 def _auth_on(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    monkeypatch.setenv("SIGHTGLASS_AUTH_REQUIRED", "true")
+    monkeypatch.setenv("BARE_AUTH_REQUIRED", "true")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -153,7 +153,7 @@ def test_every_api_route_refuses_an_unknown_token(
     env: tuple[TestClient, sessionmaker[Session]], method: str, path: str
 ) -> None:
     client, _ = env
-    assert _call(client, method, path, "sgt_not-a-real-token-at-all").status_code == 401
+    assert _call(client, method, path, "bare_not-a-real-token-at-all").status_code == 401
 
 
 def test_health_endpoints_stay_open(env: tuple[TestClient, sessionmaker[Session]]) -> None:
@@ -223,7 +223,7 @@ def test_alternate_header_is_accepted(env: tuple[TestClient, sessionmaker[Sessio
     """Some proxies strip Authorization outright."""
     client, factory = env
     token = _mint(factory, "ci", Scope.CI)
-    response = client.get("/api/runs", headers={"X-Sightglass-Token": token})
+    response = client.get("/api/runs", headers={"X-Bare-Token": token})
     assert response.status_code != 401
 
 
@@ -259,7 +259,7 @@ def test_rejection_is_audited_without_the_token(
     env: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
     client, factory = env
-    secret = "sgt_thisIsNotARealTokenButLooksLikeOne1234"
+    secret = "bare_thisIsNotARealTokenButLooksLikeOne1234"
     _call(client, "GET", "/api/runs", secret)
 
     with factory() as session:
@@ -267,7 +267,7 @@ def test_rejection_is_audited_without_the_token(
         assert entries, "a rejected credential must be auditable"
         rendered = str([e.detail for e in entries])
         assert secret not in rendered
-        assert "sgt_thisIsNo" in rendered  # the redacted prefix, for correlation
+        assert "bare_thisIsNo" in rendered  # the redacted prefix, for correlation
 
 
 def test_garbage_credential_is_not_recorded_as_a_token_prefix(
@@ -291,7 +291,7 @@ def test_auth_can_be_disabled_for_local_development(
     monkeypatch: pytest.MonkeyPatch, env: tuple[TestClient, sessionmaker[Session]]
 ) -> None:
     client, _ = env
-    monkeypatch.setenv("SIGHTGLASS_AUTH_REQUIRED", "false")
+    monkeypatch.setenv("BARE_AUTH_REQUIRED", "false")
     get_settings.cache_clear()
     try:
         assert client.get("/api/runs").status_code == 200
@@ -305,7 +305,7 @@ def test_auth_is_required_by_default() -> None:
     get_settings.cache_clear()
     import os
 
-    os.environ.pop("SIGHTGLASS_AUTH_REQUIRED", None)
+    os.environ.pop("BARE_AUTH_REQUIRED", None)
     try:
         assert get_settings().auth_required is True
     finally:

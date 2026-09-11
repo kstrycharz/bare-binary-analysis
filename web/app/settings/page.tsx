@@ -19,7 +19,7 @@ export default async function SettingsPage() {
       <header>
         <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 max-w-3xl text-sm text-content-muted">
-          Sightglass is deterministic first. Everything below is optional — with
+          BARE is deterministic first. Everything below is optional — with
           no model configured, scans still run and reports are still complete.
         </p>
       </header>

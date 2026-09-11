@@ -23,14 +23,14 @@ class TestTaskRegistration:
         the worker at startup and nothing else in the suite notices."""
         import core.orchestrator.tasks  # noqa: F401
 
-        assert "sightglass.reap_containers" in celery_app.tasks
+        assert "bare.reap_containers" in celery_app.tasks
 
     def test_reaper_runs_on_the_control_queue(self) -> None:
         """Not on an analyzer queue: the sweep must still happen when every
         analyzer lane is saturated or wedged."""
         import core.orchestrator.tasks  # noqa: F401
 
-        task = celery_app.tasks["sightglass.reap_containers"]
+        task = celery_app.tasks["bare.reap_containers"]
         assert task.queue == QUEUE_CONTROL
 
 
@@ -51,7 +51,7 @@ class TestQueueTopology:
     def test_beat_schedules_the_reaper_sweep(self) -> None:
         schedule = celery_app.conf.beat_schedule
         assert "reap-orphaned-containers" in schedule
-        assert schedule["reap-orphaned-containers"]["task"] == "sightglass.reap_containers"
+        assert schedule["reap-orphaned-containers"]["task"] == "bare.reap_containers"
 
 
 class TestSerialization:

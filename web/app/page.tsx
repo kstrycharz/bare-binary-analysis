@@ -411,7 +411,7 @@ function FirstRun() {
     <section className="surface-panel rounded-xl border border-border bg-surface px-8 py-14 text-center">
       <p className="text-[17px] font-semibold">No scans yet</p>
       <p className="mx-auto mt-2.5 max-w-lg text-[13.5px] leading-relaxed text-content-muted text-pretty">
-        Upload an installer, executable, archive, or firmware image. Sightglass
+        Upload an installer, executable, archive, or firmware image. BARE
         unpacks it recursively and reports the secrets, internal hostnames, and
         build metadata baked into what you are about to ship.
       </p>

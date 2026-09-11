@@ -62,14 +62,14 @@ container and reads badly in an audit.
 
 ### ADR-0006 — Windows is a first-class development environment (2026-08-17)
 `make.ps1` mirrors every Makefile target.
-**Rationale:** most artifacts Sightglass analyses are Windows binaries, so a
+**Rationale:** most artifacts BARE analyses are Windows binaries, so a
 Windows dev box is not an afterthought, and GNU make is not present by default
 there. The Makefile stays canonical for CI and Linux.
 **Cost:** two files to keep in sync; every new target needs an entry in both.
 
 ### ADR-0007 — Run root is mounted at the same absolute path on host and worker (2026-08-17)
 *(Superseded by ADR-0009.)*
-`${SIGHTGLASS_RUN_ROOT}:${SIGHTGLASS_RUN_ROOT}` rather than a named volume.
+`${BARE_RUN_ROOT}:${BARE_RUN_ROOT}` rather than a named volume.
 **Rationale:** the worker spawns analyzer containers as *siblings* through the
 host Docker socket, and the daemon resolves their bind mounts on the host. A
 path that exists only inside the worker yields analyzers with empty input
@@ -134,7 +134,7 @@ Browser calls go through `web/app/api/[...path]/route.ts`, a Route Handler
 using `node:http`. `next.config.ts` declares no `rewrites()`.
 **Rationale:** two failures, both found only by using the UI. Next resolves
 `rewrites()` at *build* time and bakes the result into the routes manifest, so
-an image built without `SIGHTGLASS_API_URL` proxies to `localhost:8000`
+an image built without `BARE_API_URL` proxies to `localhost:8000`
 forever — and since server components read the env at runtime, every page
 renders fine and only uploads, triage, and status changes fail with a 500.
 Then `fetch` proved unusable for the proxy itself: Next patches global fetch
@@ -156,7 +156,7 @@ display and audit; the number a human reads comes from a clock that only moves
 forward.
 
 ### ADR-0015 — The release gate is a product surface, not a script (2026-08-18)
-`core/policy/` is a dependency-light engine (stdlib + PyYAML), `sightglass
+`core/policy/` is a dependency-light engine (stdlib + PyYAML), `bare
 scan` is the CI entry point, and the verdict has four distinct exit codes:
 0 pass, 1 blocked, 2 tool error, 3 inconclusive.
 **Rationale:** a scanner that can only be driven by a human uploading a file
@@ -233,7 +233,7 @@ argument, which typer 0.15.1 does not pass. The resolver happily picks a newer
 click, and the result is that *every* `--help` in the CLI dies with a
 `TypeError` while the commands themselves run fine — so it survives a smoke
 test and fails the first person who asks the tool what its flags are. Found
-while building `sightglass scan`; it was already broken for `sandbox hello`.
+while building `bare scan`; it was already broken for `sandbox hello`.
 **Follow-up:** remove the pin when typer supports click 8.2+.
 
 ### ADR-0021 — Rules carry an explicit exclusion list, not negative lookaheads (2026-08-19)
@@ -401,7 +401,7 @@ a name, so `ArtifactOut.model_validate(artifact)` made Pydantic read the ORM
 relationship — lazy-loading that node's entire subtree from the database,
 recursively, for every node, and discarding all of it on the next line where
 `build()` assigned the real children. 500 nodes took 58 seconds. Constructed
-explicitly, the same 500 take under 0.1s. `sightglass scan` polls that endpoint
+explicitly, the same 500 take under 0.1s. `bare scan` polls that endpoint
 every 20 seconds for the duration of a scan.
 
 **Why not `lazy="raise"` on the relationship instead.** It would have turned
@@ -509,8 +509,8 @@ the specific failure mode this decision exists to avoid.
 ### Context
 
 The stack has two kinds of image. Compose ran four of them (the shared backend
-image, the dashboard) and knew nothing about the other three — `sightglass/hello:dev`,
-`sightglass/static:dev`, `sightglass/unpack:dev` — because those are never run
+image, the dashboard) and knew nothing about the other three — `bare/hello:dev`,
+`bare/static:dev`, `bare/unpack:dev` — because those are never run
 by Compose. The worker spawns them as siblings through the Docker socket, so
 they were built out of band by `make images`.
 
@@ -518,7 +518,7 @@ That split produced a bad failure. A fresh clone following the README's
 `docker compose up --build -d` came up entirely healthy: every service passed
 its healthcheck, `/readyz` was green, the dashboard's setup wizard minted a
 token. The first scan then failed in the worker with `START_FAILED`, because
-`sightglass/static:dev` did not exist. `DockerDriver` goes straight to
+`bare/static:dev` did not exist. `DockerDriver` goes straight to
 `containers.create` and never builds or pulls, and the tags are local-only, so
 the daemon's implicit pull went to Docker Hub and found nothing.
 
@@ -534,7 +534,7 @@ Each analyzer image gets a Compose service that builds it and exits:
 ```yaml
   analyzer-static:
     build: {context: ., dockerfile: sandbox/images/static/Dockerfile}
-    image: sightglass/static:${SIGHTGLASS_ANALYZER_TAG:-dev}
+    image: bare/static:${BARE_ANALYZER_TAG:-dev}
     pull_policy: build
     entrypoint: ["/bin/true"]
     restart: "no"
@@ -542,10 +542,10 @@ Each analyzer image gets a Compose service that builds it and exits:
 
 `pull_policy: build` is load-bearing and was missed on the first attempt, which
 reproduced the original bug one layer up. Naming the image is what makes the
-tag shared with the orchestrator, but `sightglass/static` also parses as a
+tag shared with the orchestrator, but `bare/static` also parses as a
 Docker Hub reference, and Compose's default policy is to pull an image it does
 not find locally. On a fresh machine that is a Docker Hub lookup for a
-repository that does not exist: `pull access denied for sightglass/static`,
+repository that does not exist: `pull access denied for bare/static`,
 and the build that was supposed to happen never runs. The backend and web
 services never hit this because they declare no `image:` at all and get
 project-scoped names nothing could resolve.
@@ -577,7 +577,7 @@ build invocation was how the `unpack` image came to be missing from
 `docs/SETUP.md`'s list in the first place.
 
 Delegating also fixed a live mismatch: `make images` with an exported-but-empty
-`SIGHTGLASS_ANALYZER_TAG` built `sightglass/hello:`, which the daemon rejects
+`BARE_ANALYZER_TAG` built `bare/hello:`, which the daemon rejects
 with an error naming nothing useful, while a scan went looking for `:dev`. The
 Makefile now normalises the variable the way `analyzer_tag()` does.
 
@@ -722,7 +722,7 @@ writes to that runtime copy. The packaged file is what every deployment
 inherits before anyone has configured anything.
 
 It shipped with `enabled: true` and two Ollama providers pointing at a
-developer's LAN address. So a clean install of Sightglass, on any network,
+developer's LAN address. So a clean install of BARE, on any network,
 started up believing it had two working models on a machine it had never heard
 of. Opening the settings page probed both, and each probe waited out its
 timeout — 15 seconds, serially, because the endpoint had no listener to refuse

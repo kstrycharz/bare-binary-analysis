@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from api.deps import get_caller
 from core.composition import Component, ComponentInventory, Confidence, Ecosystem
-from core.config import SIGHTGLASS_VERSION
+from core.config import BARE_VERSION
 from core.db import get_session
 from core.models import Artifact, Finding, FindingLocation, Run, RunManifest, RunStage
 from core.models.enums import StageStatus
@@ -75,7 +75,7 @@ class GateResponse(BaseModel):
     run_id: str
     artifact: str = ""
     """The root artifact's name. A verdict that does not say what it is about
-    is hard to act on when it arrives days later from `sightglass gate`."""
+    is hard to act on when it arrives days later from `bare gate`."""
 
     baseline: str
     baseline_run_id: str | None = None
@@ -217,7 +217,7 @@ def get_sarif(
 
     return build_sarif(
         projected,
-        tool_version=SIGHTGLASS_VERSION,
+        tool_version=BARE_VERSION,
         artifact_name=root_name,
         run_id=run_id,
     )
@@ -320,7 +320,7 @@ def get_pdf_report(
         )
     )
 
-    filename = f"sightglass-{(root.name if root else run_id)}.pdf".replace(" ", "-")
+    filename = f"bare-{(root.name if root else run_id)}.pdf".replace(" ", "-")
     return Response(
         content=document,
         media_type="application/pdf",
@@ -382,5 +382,5 @@ def get_sbom(
         artifact_name=root.name if root else run_id,
         artifact_sha256=root.sha256 if root else "",
         artifact_size_bytes=root.size_bytes if root else 0,
-        tool_version=SIGHTGLASS_VERSION,
+        tool_version=BARE_VERSION,
     )

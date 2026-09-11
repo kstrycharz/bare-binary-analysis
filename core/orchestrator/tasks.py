@@ -60,7 +60,7 @@ def _active_run_ids() -> list[str] | None:
     return None
 
 
-@celery_app.task(name="sightglass.reap_containers", queue=QUEUE_CONTROL)
+@celery_app.task(name="bare.reap_containers", queue=QUEUE_CONTROL)
 def reap_containers() -> dict[str, Any]:
     """Periodic sweep for containers a crashed orchestrator left behind."""
     settings = get_settings()
@@ -89,7 +89,7 @@ def reap_containers() -> dict[str, Any]:
     }
 
 
-@celery_app.task(name="sightglass.recover_orphaned_runs", queue=QUEUE_CONTROL)
+@celery_app.task(name="bare.recover_orphaned_runs", queue=QUEUE_CONTROL)
 def recover_orphaned_runs() -> dict[str, Any]:
     """Periodic sweep for runs whose Celery task was lost.
 
@@ -134,11 +134,11 @@ def recover_orphaned_runs() -> dict[str, Any]:
     return report
 
 
-@celery_app.task(name="sightglass.sandbox_smoke_test", queue=QUEUE_CONTROL)
+@celery_app.task(name="bare.sandbox_smoke_test", queue=QUEUE_CONTROL)
 def sandbox_smoke_test(run_id: str, staging_dir: str, results_dir: str) -> dict[str, Any]:
     """Run the hello analyzer through the real driver.
 
-    Used by ``sightglass sandbox hello`` and by the M0 acceptance check. It is
+    Used by ``bare sandbox hello`` and by the M0 acceptance check. It is
     the end-to-end proof that the boundary works before any analyzer depends
     on it.
     """

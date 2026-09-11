@@ -37,7 +37,7 @@ from core.sandbox.watchdog import WatchdogVerdict, enforce_deadline
 
 log = structlog.get_logger(__name__)
 
-MANAGED_LABEL = "sightglass.managed"
+MANAGED_LABEL = "bare.managed"
 _MAX_LOG_BYTES = 8 * 1024 * 1024
 
 
@@ -288,8 +288,8 @@ class DockerDriver(SandboxDriver):
             managed.append(
                 ManagedContainer(
                     container_id=str(container.id),
-                    run_id=labels.get("sightglass.run", ""),
-                    analyzer=labels.get("sightglass.analyzer", ""),
+                    run_id=labels.get("bare.run", ""),
+                    analyzer=labels.get("bare.analyzer", ""),
                     created_at=_parse_docker_time(attrs.get("Created")),
                     running=attrs.get("State", {}).get("Running", False),
                     name=str(getattr(container, "name", "")),
@@ -434,7 +434,7 @@ class DockerDriver(SandboxDriver):
             if len(raw) > _MAX_LOG_BYTES:
                 # A runaway analyzer must not be able to OOM the orchestrator
                 # through its log stream.
-                return raw[:_MAX_LOG_BYTES] + b"\n[sightglass: log truncated]\n"
+                return raw[:_MAX_LOG_BYTES] + b"\n[bare: log truncated]\n"
             return raw
 
         return read(stdout=True, stderr=False), read(stdout=False, stderr=True)

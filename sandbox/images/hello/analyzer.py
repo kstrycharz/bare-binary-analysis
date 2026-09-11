@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Reference analyzer: the smallest thing that exercises the whole contract.
 
-Every Sightglass analyzer image obeys the same contract, and this one exists to
+Every BARE analyzer image obeys the same contract, and this one exists to
 prove the contract works before any real analysis code depends on it:
 
   * read the artifact from ``/input`` (read-only bind mount)
@@ -47,7 +47,7 @@ def probe() -> dict[str, Any]:
     """Report the isolation posture as observed from inside the container."""
 
     def write_rootfs() -> None:
-        Path("/sightglass-probe").write_text("should not be possible", encoding="utf-8")
+        Path("/bare-probe").write_text("should not be possible", encoding="utf-8")
 
     def write_input() -> None:
         (INPUT_DIR / ".probe").write_text("should not be possible", encoding="utf-8")
@@ -130,7 +130,7 @@ def scan_input() -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Sightglass hello analyzer")
+    parser = argparse.ArgumentParser(description="BARE hello analyzer")
     parser.add_argument(
         "--probe",
         action="store_true",

@@ -83,10 +83,10 @@ class TestTokenPrimitives:
     @pytest.mark.parametrize(
         ("header", "expected"),
         [
-            ("Bearer sgt_abc", "sgt_abc"),
-            ("bearer sgt_abc", "sgt_abc"),
-            ("BEARER  sgt_abc  ", "sgt_abc"),
-            ("sgt_abc", "sgt_abc"),  # bare token: proxies mangle the scheme
+            ("Bearer bare_abc", "bare_abc"),
+            ("bearer bare_abc", "bare_abc"),
+            ("BEARER  bare_abc  ", "bare_abc"),
+            ("bare_abc", "bare_abc"),  # bare token: proxies mangle the scheme
             ("", None),
             ("   ", None),
             (None, None),

@@ -1,4 +1,4 @@
-"""`sightglass token` — mint, list, and revoke API credentials.
+"""`bare token` — mint, list, and revoke API credentials.
 
 These talk to the **database directly**, not to the API, and so must be run
 where the database is reachable — on the server, or in the API container. That
@@ -6,7 +6,7 @@ is deliberate: a credential-minting endpoint reachable over the network is a
 privilege-escalation target, and the one operation that must never depend on
 already having a token is creating the first one.
 
-    docker compose exec api sightglass token create ci-pipeline --scope ci
+    docker compose exec api bare token create ci-pipeline --scope ci
 """
 
 from __future__ import annotations

@@ -206,7 +206,7 @@ export default function ScanPage() {
             <p className="mt-1 text-xs text-content-muted">
               Recorded in the audit log and stamped into reports. The
               attestation gate is disabled for prototyping — set{" "}
-              <code className="font-mono">SIGHTGLASS_REQUIRE_ATTESTATION=true</code>{" "}
+              <code className="font-mono">BARE_REQUIRE_ATTESTATION=true</code>{" "}
               to make this mandatory before analysing artifacts you did not
               build.
             </p>

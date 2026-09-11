@@ -13,7 +13,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 
-const API_URL = process.env.SIGHTGLASS_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.BARE_API_URL ?? "http://localhost:8000";
 
 export const config = {
   // Everything except Next's own internals and the proxy — the proxy must

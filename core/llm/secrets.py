@@ -38,7 +38,7 @@ def key_store_path() -> Path:
     Defaults under `Settings.data_dir` — the same volume the live LLM config
     uses — so a key configured through the wizard survives a rebuild.
     """
-    override = os.environ.get("SIGHTGLASS_LLM_KEY_STORE")
+    override = os.environ.get("BARE_LLM_KEY_STORE")
     if override:
         return Path(override)
 

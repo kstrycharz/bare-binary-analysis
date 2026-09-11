@@ -1,4 +1,4 @@
-# Sightglass release gate — GitLab CI
+# BARE release gate — GitLab CI
 #
 # Copy the `release-gate` job into your .gitlab-ci.yml.
 
@@ -12,9 +12,9 @@ variables:
 
 build:
   stage: build
-  # SIGHTGLASS_TOKEN must be a **ci**-scoped token: a build agent submits and
+  # BARE_TOKEN must be a **ci**-scoped token: a build agent submits and
   # receives a verdict, and must not be able to read the findings corpus.
-  #   sightglass token create gitlab-ci --scope ci --expires-in-days 90
+  #   bare token create gitlab-ci --scope ci --expires-in-days 90
   script:
     - ./scripts/build.sh
   artifacts:
@@ -28,21 +28,21 @@ release-gate:
   before_script:
     # Not on PyPI yet — pin a tag or use an internal index. A gate that
     # updates itself silently has a verdict you cannot reproduce.
-    - pip install --no-cache-dir "sightglass @ git+https://gitlab.example.com/sec/sightglass@v0.0.1"
+    - pip install --no-cache-dir "bare @ git+https://gitlab.example.com/sec/bare@v0.0.1"
   script:
-    # SIGHTGLASS_API_URL and SIGHTGLASS_TOKEN come from masked CI/CD variables.
+    # BARE_API_URL and BARE_TOKEN come from masked CI/CD variables.
     # The attestation fills itself in from GITLAB_USER_LOGIN and
     # CI_PIPELINE_URL, so the audit log records who triggered the release.
     - |
-      sightglass scan "$ARTIFACT" \
+      bare scan "$ARTIFACT" \
         --sarif gl-sast-report.json \
-        --json  sightglass-verdict.json \
+        --json  bare-verdict.json \
         --timeout 1800
   artifacts:
     when: always          # the report matters most when the job failed
     expire_in: 30 days
     paths:
-      - sightglass-verdict.json
+      - bare-verdict.json
     reports:
       sast: gl-sast-report.json
 

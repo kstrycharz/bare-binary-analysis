@@ -27,7 +27,7 @@ from enum import StrEnum
 # A visible prefix so a leaked token is greppable in logs and recognisable in a
 # secret scanner — including this one. It is not a security control; it is an
 # incident-response affordance.
-TOKEN_PREFIX = "sgt_"
+TOKEN_PREFIX = "bare_"
 
 # 32 bytes of urlsafe base64. Long enough that brute force is not a threat
 # model, short enough to paste into a CI secret field.

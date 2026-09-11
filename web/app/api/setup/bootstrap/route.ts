@@ -13,7 +13,7 @@ import { setApiToken } from "@/lib/runtime-token";
 
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.SIGHTGLASS_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.BARE_API_URL ?? "http://localhost:8000";
 
 export async function POST() {
   let upstream: Response;
@@ -24,7 +24,7 @@ export async function POST() {
     });
   } catch (error) {
     return NextResponse.json(
-      { detail: `could not reach the Sightglass API at ${API_URL}: ${String(error)}` },
+      { detail: `could not reach the BARE API at ${API_URL}: ${String(error)}` },
       { status: 502 },
     );
   }

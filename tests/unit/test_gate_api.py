@@ -194,7 +194,7 @@ def test_sarif_endpoint_returns_a_valid_document(client: TestClient) -> None:
     assert result["ruleId"] == "aws_secret_key"
     assert result["level"] == "error"
     assert result["locations"][0]["physicalLocation"]["region"]["byteOffset"] == 4096
-    assert result["partialFingerprints"]["sightglassFindingId"] == "finding-critical"
+    assert result["partialFingerprints"]["bareFindingId"] == "finding-critical"
 
 
 def test_sarif_carries_no_plaintext(client: TestClient) -> None:

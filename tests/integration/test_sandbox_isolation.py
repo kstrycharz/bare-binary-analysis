@@ -6,7 +6,7 @@ inside*, because the daemon's own description of a container's configuration
 is not evidence that the configuration took effect.
 
 Requires Docker and the hello analyzer image (``make images``); the tag
-follows ``SIGHTGLASS_ANALYZER_TAG``.
+follows ``BARE_ANALYZER_TAG``.
 Skipped otherwise so the unit suite stays runnable anywhere.
 """
 
@@ -123,7 +123,7 @@ class TestEndToEnd:
     ) -> None:
         result = driver.run(make_spec(run_dirs))
         remaining = docker_client.containers.list(
-            all=True, filters={"label": "sightglass.run=run-1"}
+            all=True, filters={"label": "bare.run=run-1"}
         )
         assert [c.id for c in remaining] == []
         assert result.container_id is not None
@@ -218,7 +218,7 @@ class TestWatchdog:
         assert result.status is SandboxStatus.TIMEOUT
         assert result.status.is_degraded
         assert result.duration_s < 60
-        assert docker_client.containers.list(filters={"label": "sightglass.run=run-1"}) == []
+        assert docker_client.containers.list(filters={"label": "bare.run=run-1"}) == []
 
     def test_failing_analyzer_is_reported_not_raised(
         self, driver: DockerDriver, run_dirs: tuple[Path, Path, Path]
@@ -277,4 +277,4 @@ class TestReaperIntegration:
             driver.remove(result.container_id or "", force=True)
 
     def test_remove_is_idempotent(self, driver: DockerDriver) -> None:
-        driver.remove("sightglass-nonexistent-container", force=True)
+        driver.remove("bare-nonexistent-container", force=True)

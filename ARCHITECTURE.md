@@ -2,7 +2,7 @@
 
 ## The governing constraint
 
-Sightglass is a deterministic scanner with a very good AI investigator attached.
+BARE is a deterministic scanner with a very good AI investigator attached.
 It is not an AI tool with rules bolted on, and that distinction is
 architectural rather than rhetorical. Everything below defers to it.
 
@@ -10,7 +10,7 @@ architectural rather than rhetorical. Everything below defers to it.
 + same rule pack + same tool versions ⇒ byte-identical findings, enforced by a
 CI test that runs the corpus twice and diffs normalized JSON. Every run writes a
 manifest — artifact SHA-256, rule-pack version and hash, analyzer image digests
-(not tags), tool versions, Sightglass version — and the report prints it.
+(not tags), tool versions, BARE version — and the report prints it.
 Finding IDs are content-derived from `hash(rule_id + value_hash + artifact_path
 + offset)`, never sequence numbers, so they are stable across re-runs and
 comparable across releases. Sort orders are explicit everywhere; analyzers write
@@ -163,7 +163,7 @@ rather than as an unbounded hang the watchdog would misdiagnose as a timeout.
 ### Reaper
 
 A crashed orchestrator leaks containers holding memory the next run needs. The
-reaper sweeps everything labelled `sightglass.managed`, removing containers
+reaper sweeps everything labelled `bare.managed`, removing containers
 whose run is no longer active or which have outlived `max_age`.
 
 It is conservative in one direction on purpose: it never removes a container
@@ -231,7 +231,7 @@ The artifact tree is a real tree, not a flat list: the report must be able to
 say "in `setup.exe` → `app.7z` → `resources/app.asar` → `config/prod.json`".
 
 Suppressions key on `value_hash` + rule + artifact-path pattern and are portable
-across runs via a checked-in `.sightglass-ignore.yaml`. If a user cannot
+across runs via a checked-in `.bare-ignore.yaml`. If a user cannot
 suppress a known-benign finding once and have it stay suppressed, they stop
 using the tool by week three.
 

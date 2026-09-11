@@ -1,6 +1,6 @@
 {
   "_comment": [
-    "Sightglass static-analyzer seccomp profile.",
+    "BARE static-analyzer seccomp profile.",
     "Allowlist, not denylist: anything not named here returns EPERM. That is",
     "deliberate — a denylist silently admits every syscall added by a future",
     "kernel, and this file is the last line under cap_drop=ALL, read-only",

@@ -1,6 +1,6 @@
 """The CI-facing commands: ``scan``, ``gate``, and ``policy``.
 
-``sightglass scan`` is the whole product from a pipeline's point of view. It
+``bare scan`` is the whole product from a pipeline's point of view. It
 uploads the artifact the build just produced, waits for the scan, evaluates the
 release policy, writes the machine-readable artefacts a pipeline wants, and
 exits with a code that means something:
@@ -26,7 +26,7 @@ from typing import Annotated, NoReturn
 
 import typer
 
-from cli.client import ApiError, SightglassClient
+from cli.client import ApiError, BareClient
 from cli.gate_output import render_json, render_markdown, render_text
 from core.policy import (
     POLICY_DIR,
@@ -132,30 +132,30 @@ def _write_job_summary(markdown: str) -> None:
 def scan(
     artifact: Annotated[Path, typer.Argument(help="The built artifact to scan.")],
     api: Annotated[
-        str, typer.Option(envvar="SIGHTGLASS_API_URL", help="Sightglass API base URL.")
+        str, typer.Option(envvar="BARE_API_URL", help="BARE API base URL.")
     ] = "http://localhost:8000",
     token: Annotated[
         str,
-        typer.Option(envvar="SIGHTGLASS_TOKEN", help="Bearer token, if the deployment needs one."),
+        typer.Option(envvar="BARE_TOKEN", help="Bearer token, if the deployment needs one."),
     ] = "",
     policy: Annotated[
         Path | None,
-        typer.Option("--policy", help="Policy file. Defaults to .sightglass/policy.yaml."),
+        typer.Option("--policy", help="Policy file. Defaults to .bare/policy.yaml."),
     ] = None,
     waivers: Annotated[
         Path | None,
-        typer.Option("--waivers", help="Waiver file. Defaults to .sightglass/waivers.yaml."),
+        typer.Option("--waivers", help="Waiver file. Defaults to .bare/waivers.yaml."),
     ] = None,
     baseline_run: Annotated[
         str, typer.Option(help="Compare against this run id instead of the last same-named run.")
     ] = "",
     attested_by: Annotated[
-        str, typer.Option(envvar="SIGHTGLASS_ATTESTED_BY", help="Who authorises this scan.")
+        str, typer.Option(envvar="BARE_ATTESTED_BY", help="Who authorises this scan.")
     ] = "",
     attestation_ref: Annotated[
         str,
         typer.Option(
-            envvar="SIGHTGLASS_ATTESTATION_REF", help="Ticket, contract, or pipeline URL."
+            envvar="BARE_ATTESTATION_REF", help="Ticket, contract, or pipeline URL."
         ),
     ] = "",
     profile: Annotated[str, typer.Option(help="quick | standard | deep.")] = "standard",
@@ -220,7 +220,7 @@ def scan(
             "or run in a CI environment that sets them"
         )
 
-    client = SightglassClient(api, token=token)
+    client = BareClient(api, token=token)
 
     # --- upload ----------------------------------------------------------
     typer.echo(f"uploading {artifact.name} ({artifact.stat().st_size:,} bytes) to {api}")
@@ -288,7 +288,7 @@ def scan(
 def _emit_verdict(
     verdict: GateVerdict,
     *,
-    client: SightglassClient,
+    client: BareClient,
     api: str,
     run_id: str,
     artifact_name: str,
@@ -369,19 +369,19 @@ def _emit_verdict(
 def gate(
     run_id: Annotated[str, typer.Argument(help="An existing run id to re-evaluate.")],
     api: Annotated[
-        str, typer.Option(envvar="SIGHTGLASS_API_URL", help="Sightglass API base URL.")
+        str, typer.Option(envvar="BARE_API_URL", help="BARE API base URL.")
     ] = "http://localhost:8000",
     token: Annotated[
         str,
-        typer.Option(envvar="SIGHTGLASS_TOKEN", help="Bearer token, if the deployment needs one."),
+        typer.Option(envvar="BARE_TOKEN", help="Bearer token, if the deployment needs one."),
     ] = "",
     policy: Annotated[
         Path | None,
-        typer.Option("--policy", help="Policy file. Defaults to .sightglass/policy.yaml."),
+        typer.Option("--policy", help="Policy file. Defaults to .bare/policy.yaml."),
     ] = None,
     waivers: Annotated[
         Path | None,
-        typer.Option("--waivers", help="Waiver file. Defaults to .sightglass/waivers.yaml."),
+        typer.Option("--waivers", help="Waiver file. Defaults to .bare/waivers.yaml."),
     ] = None,
     baseline_run: Annotated[
         str, typer.Option(help="Compare against this run id instead of the linked predecessor.")
@@ -430,7 +430,7 @@ def gate(
         waiver_path = candidate if candidate.is_file() else None
     waivers_yaml = _read_optional(waiver_path)
 
-    client = SightglassClient(api, token=token)
+    client = BareClient(api, token=token)
     try:
         payload = client.get_gate(
             run_id,
@@ -499,7 +499,7 @@ def policy_init(
     directory: Annotated[Path, typer.Argument(help="Repository root.")] = Path(),
     force: Annotated[bool, typer.Option(help="Overwrite an existing policy.")] = False,
 ) -> None:
-    """Write a starter policy into ``.sightglass/``."""
+    """Write a starter policy into ``.bare/``."""
     target_dir = directory / POLICY_DIR
     target = target_dir / POLICY_FILE
     if target.exists() and not force:
@@ -512,14 +512,14 @@ def policy_init(
     target_dir.mkdir(parents=True, exist_ok=True)
     target.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
     typer.secho(f"wrote {target}", fg=typer.colors.GREEN)
-    typer.echo("Review it, commit it, and wire `sightglass scan` into your release pipeline.")
+    typer.echo("Review it, commit it, and wire `bare scan` into your release pipeline.")
 
 
 @policy_app.command("explain")
 def policy_explain() -> None:
     """Print the built-in defaults, which apply when no policy file is found."""
     defaults = parse_policy({})
-    typer.echo("Built-in defaults (used when no .sightglass/policy.yaml is present):")
+    typer.echo("Built-in defaults (used when no .bare/policy.yaml is present):")
     typer.echo(f"  block at or above : {defaults.block_at_or_above}")
     typer.echo(f"  baseline mode     : {defaults.baseline_mode.value}")
     typer.echo(f"  on degraded scan  : {defaults.on_degraded.value}")
@@ -532,11 +532,11 @@ def policy_explain() -> None:
 def sbom(
     run_id: Annotated[str, typer.Argument(help="The run to export.")],
     api: Annotated[
-        str, typer.Option(envvar="SIGHTGLASS_API_URL", help="Sightglass API base URL.")
+        str, typer.Option(envvar="BARE_API_URL", help="BARE API base URL.")
     ] = "http://localhost:8000",
     token: Annotated[
         str,
-        typer.Option(envvar="SIGHTGLASS_TOKEN", help="Bearer token, if the deployment needs one."),
+        typer.Option(envvar="BARE_TOKEN", help="Bearer token, if the deployment needs one."),
     ] = "",
     out: Annotated[
         Path | None,
@@ -554,9 +554,9 @@ def sbom(
 
     Writes to stdout by default so it pipes:
 
-        sightglass sbom RUN_ID | jq '.components | length'
+        bare sbom RUN_ID | jq '.components | length'
     """
-    client = SightglassClient(api, token=token)
+    client = BareClient(api, token=token)
     try:
         document = client.get_sbom(run_id)
     except ApiError as exc:

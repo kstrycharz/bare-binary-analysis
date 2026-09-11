@@ -89,14 +89,14 @@ def _rule_descriptor(rule_id: str, findings: list[SarifFinding]) -> dict[str, An
         "name": rule_id,
         "shortDescription": {"text": sample.title},
         "fullDescription": {
-            "text": f"Sightglass rule {rule_id} matched in a shipped artifact."
+            "text": f"BARE rule {rule_id} matched in a shipped artifact."
         },
         "help": {"text": help_text, "markdown": help_text},
         "defaultConfiguration": {"level": _LEVEL_BY_SEVERITY[worst]},
         "properties": {
             "tags": [t for t in ("security", sample.category) if t],
             "security-severity": _SECURITY_SEVERITY[worst],
-            "sightglass-severity": worst.value,
+            "bare-severity": worst.value,
         },
     }
     if sample.cwe:
@@ -135,7 +135,7 @@ def _result(finding: SarifFinding, rule_index: int) -> dict[str, Any]:
         "locations": [location],
         # Stable across runs, so a code-scanning service tracks a finding
         # rather than re-opening it on every build (ADR-0010).
-        "partialFingerprints": {"sightglassFindingId": finding.id},
+        "partialFingerprints": {"bareFindingId": finding.id},
         "properties": {
             "severity": finding.severity.value,
             "category": finding.category,
@@ -153,7 +153,7 @@ def build_sarif(
     verdict: GateVerdict | None = None,
     artifact_name: str = "",
     run_id: str = "",
-    information_uri: str = "https://github.com/sightglass/sightglass",
+    information_uri: str = "https://github.com/bare/bare",
 ) -> dict[str, Any]:
     """Build a SARIF log. Deterministic: rules and results are both sorted."""
     ordered = sorted(findings, key=lambda f: (f.severity.rank, f.rule_id, f.id))
@@ -166,7 +166,7 @@ def build_sarif(
     rule_index = {rule_id: index for index, rule_id in enumerate(rule_ids)}
     rules = [_rule_descriptor(rule_id, by_rule[rule_id]) for rule_id in rule_ids]
 
-    run_properties: dict[str, Any] = {"sightglassRunId": run_id}
+    run_properties: dict[str, Any] = {"bareRunId": run_id}
     if artifact_name:
         run_properties["artifact"] = artifact_name
     if verdict is not None:
@@ -186,7 +186,7 @@ def build_sarif(
             {
                 "tool": {
                     "driver": {
-                        "name": "Sightglass",
+                        "name": "BARE",
                         "version": tool_version,
                         "informationUri": information_uri,
                         "rules": rules,

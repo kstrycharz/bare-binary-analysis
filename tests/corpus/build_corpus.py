@@ -281,7 +281,7 @@ def build_nested_release(out: Path, installer: Path) -> list[Planted]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build the Sightglass synthetic corpus")
+    parser = argparse.ArgumentParser(description="Build the BARE synthetic corpus")
     parser.add_argument("--out", type=Path, default=OUT_DIR)
     args = parser.parse_args()
 

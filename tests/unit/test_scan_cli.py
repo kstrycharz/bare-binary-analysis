@@ -1,4 +1,4 @@
-"""The `sightglass scan` command, end to end over real HTTP.
+"""The `bare scan` command, end to end over real HTTP.
 
 Drives the actual CLI against a stub server on localhost: real multipart
 upload, real polling, real gate response, real exit code. Mocking the client
@@ -214,8 +214,8 @@ def test_missing_attestation_exits_two(artifact: Path, server: str, monkeypatch)
         "CI_PIPELINE_URL",
         "BUILD_BUILDURI",
         "BUILD_URL",
-        "SIGHTGLASS_ATTESTED_BY",
-        "SIGHTGLASS_ATTESTATION_REF",
+        "BARE_ATTESTED_BY",
+        "BARE_ATTESTATION_REF",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -267,7 +267,7 @@ def test_policy_and_waivers_travel_to_the_server(
     artifact: Path, server: str, tmp_path: Path
 ) -> None:
     """The policy goes to the API; the findings do not come back."""
-    policy_dir = tmp_path / ".sightglass"
+    policy_dir = tmp_path / ".bare"
     policy_dir.mkdir()
     (policy_dir / "policy.yaml").write_text(
         "version: 1\nname: strict\nblock:\n  severity_at_or_above: critical\n", encoding="utf-8"
@@ -321,7 +321,7 @@ def test_writes_json_sarif_and_markdown(artifact: Path, server: str, tmp_path: P
     assert verdict["run_id"] == "run-1"
 
     assert json.loads((out / "scan.sarif").read_text(encoding="utf-8"))["version"] == "2.1.0"
-    assert "Sightglass release gate" in (out / "summary.md").read_text(encoding="utf-8")
+    assert "BARE release gate" in (out / "summary.md").read_text(encoding="utf-8")
 
 
 def test_waits_for_a_running_scan_before_gating(artifact: Path, server: str) -> None:
@@ -344,7 +344,7 @@ def test_waits_for_a_running_scan_before_gating(artifact: Path, server: str) -> 
     assert polls["n"] == 1
 
 
-# --- `sightglass gate`: re-evaluate without re-uploading -------------------
+# --- `bare gate`: re-evaluate without re-uploading -------------------
 
 
 def _invoke_gate(server: str, *extra: str) -> object:

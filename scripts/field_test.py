@@ -17,7 +17,7 @@ whether an artifact ships.
     uv run python scripts/field_test.py var/fieldtest
     uv run python scripts/field_test.py var/fieldtest --rule aws_secret_key
 
-The verdicts here are about *Sightglass*, not about the projects scanned. A
+The verdicts here are about *BARE*, not about the projects scanned. A
 finding in somebody's released binary is a candidate false positive until a
 human says otherwise, and the point of this harness is to make that triage
 cheap.
@@ -209,7 +209,7 @@ def main() -> int:
 
     pack = load_rule_pack(args.rules)
     policy = Policy()  # the shipped defaults: block at high and above
-    print(f"{BOLD}Sightglass field test{RESET}")
+    print(f"{BOLD}BARE field test{RESET}")
     print(f"  rule pack : {len(pack.rules)} rules ({pack.hash[:12]})")
     print(f"  policy    : block at/above {policy.block_at_or_above}, baseline all-new")
     print(f"  corpus    : {len(artifacts)} artifacts from {args.corpus}")
@@ -227,7 +227,7 @@ def main() -> int:
         )
     print()
 
-    workdir = Path(tempfile.mkdtemp(prefix="sightglass-field-"))
+    workdir = Path(tempfile.mkdtemp(prefix="bare-field-"))
     reports: list[ArtifactReport] = []
     rule_hits: dict[str, list[tuple[str, str, Match]]] = defaultdict(list)
 

@@ -1,12 +1,12 @@
-// Sightglass release gate — Jenkins declarative pipeline
+// BARE release gate — Jenkins declarative pipeline
 
 pipeline {
   agent any
 
   environment {
-    SIGHTGLASS_API_URL = credentials('sightglass-api-url')
+    BARE_API_URL = credentials('bare-api-url')
     // A ci-scoped token: submit and receive a verdict, nothing more.
-    SIGHTGLASS_TOKEN   = credentials('sightglass-token')
+    BARE_TOKEN   = credentials('bare-token')
     ARTIFACT           = 'dist/installer.exe'
   }
 
@@ -22,17 +22,17 @@ pipeline {
         // Attestation fills itself in from CHANGE_AUTHOR and BUILD_URL.
         // No `|| true`, and no catchError: a non-zero exit is the point.
         sh '''
-          sightglass scan "$ARTIFACT" \
-            --sarif sightglass.sarif \
-            --json  sightglass-verdict.json \
+          bare scan "$ARTIFACT" \
+            --sarif bare.sarif \
+            --json  bare-verdict.json \
             --timeout 1800
         '''
       }
       post {
         always {
-          archiveArtifacts artifacts: 'sightglass-verdict.json,sightglass.sarif',
+          archiveArtifacts artifacts: 'bare-verdict.json,bare.sarif',
                            allowEmptyArchive: true
-          recordIssues tools: [sarif(pattern: 'sightglass.sarif')]
+          recordIssues tools: [sarif(pattern: 'bare.sarif')]
         }
       }
     }

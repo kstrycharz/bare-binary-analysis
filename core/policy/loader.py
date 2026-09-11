@@ -1,7 +1,7 @@
 """Loading policies and waivers from YAML.
 
-Both files live in the *release* repository (``.sightglass/policy.yaml`` and
-``.sightglass/waivers.yaml``), so they are reviewed like code and their history
+Both files live in the *release* repository (``.bare/policy.yaml`` and
+``.bare/waivers.yaml``), so they are reviewed like code and their history
 answers "who weakened the gate, when, and why" without a separate audit trail.
 
 Every load error is fatal. A gate that falls back to a permissive default when
@@ -21,7 +21,7 @@ from core.policy.model import BaselineMode, DegradedPosture, Waiver
 from core.policy.policy import UNLIMITED, Budgets, Policy
 from core.vocab import Severity
 
-POLICY_DIR = ".sightglass"
+POLICY_DIR = ".bare"
 POLICY_FILE = "policy.yaml"
 WAIVERS_FILE = "waivers.yaml"
 
@@ -220,7 +220,7 @@ def load_waivers(path: Path, policy: Policy) -> list[Waiver]:
 
 
 def discover_policy(start: Path) -> Path | None:
-    """Find ``.sightglass/policy.yaml`` at or above ``start``.
+    """Find ``.bare/policy.yaml`` at or above ``start``.
 
     Walking upward means a monorepo can hold one policy at the root and a
     stricter one beside a particular artifact, and the nearest one wins.

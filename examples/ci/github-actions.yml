@@ -1,4 +1,4 @@
-# Sightglass release gate — GitHub Actions
+# BARE release gate — GitHub Actions
 #
 # Build the artifact, scan it, and stop the release if the gate blocks.
 # Copy into .github/workflows/ and adjust the build step for your project.
@@ -32,23 +32,23 @@ jobs:
         with:
           python-version: "3.12"
 
-      # sightglass is not on PyPI yet: install from the repository at a
+      # bare is not on PyPI yet: install from the repository at a
       # pinned tag, or from a wheel on your internal index. Pin it — a gate
       # that silently updates itself has a verdict you cannot reproduce.
-      - name: Install Sightglass CLI
-        run: pip install "sightglass @ git+https://github.com/your-org/sightglass@v0.0.1"
+      - name: Install BARE CLI
+        run: pip install "bare @ git+https://github.com/your-org/bare@v0.0.1"
 
-      - name: Sightglass release gate
+      - name: BARE release gate
         id: gate
         env:
-          SIGHTGLASS_API_URL: ${{ secrets.SIGHTGLASS_API_URL }}
+          BARE_API_URL: ${{ secrets.BARE_API_URL }}
           # A ci-scoped token. An admin token here would let any workflow
-          # with repo access read every finding Sightglass has ever stored.
-          SIGHTGLASS_TOKEN: ${{ secrets.SIGHTGLASS_TOKEN }}
+          # with repo access read every finding BARE has ever stored.
+          BARE_TOKEN: ${{ secrets.BARE_TOKEN }}
         run: |
-          sightglass scan dist/installer.exe `
-            --sarif sightglass.sarif `
-            --json  sightglass.json `
+          bare scan dist/installer.exe `
+            --sarif bare.sarif `
+            --json  bare.json `
             --timeout 1800
         shell: pwsh
         # The attestation fills itself in from GITHUB_ACTOR and the run URL.
@@ -61,17 +61,17 @@ jobs:
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: sightglass.sarif
-          category: sightglass
+          sarif_file: bare.sarif
+          category: bare
 
       - name: Keep the verdict as an artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: sightglass-verdict
+          name: bare-verdict
           path: |
-            sightglass.json
-            sightglass.sarif
+            bare.json
+            bare.sarif
 
       # --- 4. publish, only if the gate passed ----------------------------
       # No `if:` needed — a blocking verdict exits non-zero and the job stops

@@ -623,7 +623,7 @@ function Explanation({ finding }: { finding: Finding }) {
     setBusy(true);
     setError(null);
     try {
-      // Bare fetch through the proxy route, not `lib/api`: that module is
+      // A bare fetch through the proxy route, not `lib/api`: that module is
       // server-only (it reads the dashboard's token from disk) and importing
       // it here pulls `node:fs` into the browser bundle, which fails the
       // build. Client components authenticate by going through the proxy,

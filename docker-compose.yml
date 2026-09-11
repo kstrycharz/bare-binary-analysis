@@ -8,8 +8,8 @@
 # socket. Bind-mount paths in those requests are resolved by the daemon on the
 # HOST, not inside the worker. So there are two paths for one directory:
 #
-#   SIGHTGLASS_RUN_ROOT_HOST — where it lives on the host (what the daemon sees)
-#   SIGHTGLASS_RUN_ROOT      — where the worker sees it (fixed, inside the image)
+#   BARE_RUN_ROOT_HOST — where it lives on the host (what the daemon sees)
+#   BARE_RUN_ROOT      — where the worker sees it (fixed, inside the image)
 #
 # The driver translates between them. A named volume cannot work here because
 # it has no host path the daemon can be given, and mounting both at an
@@ -17,7 +17,7 @@
 #
 # Get this wrong and analyzers get empty input directories with no error at all.
 
-name: sightglass
+name: bare
 
 # Docker's default json-file driver never rotates, so a stack left running for a
 # week fills the disk with logs of its own healthchecks. Every long-lived
@@ -30,40 +30,40 @@ x-logging: &logging
       max-file: "3"
 
 x-backend-env: &backend-env
-  SIGHTGLASS_DATABASE_URL: postgresql+psycopg://sightglass:sightglass@postgres:5432/sightglass
-  SIGHTGLASS_REDIS_URL: redis://redis:6379/0
-  SIGHTGLASS_S3_ENDPOINT_URL: http://minio:9000
-  SIGHTGLASS_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-sightglass}
-  SIGHTGLASS_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-sightglass}
-  SIGHTGLASS_RUN_ROOT: /var/lib/sightglass/runs
-  SIGHTGLASS_RUN_ROOT_HOST: ${SIGHTGLASS_RUN_ROOT_HOST:-/var/lib/sightglass/runs}
-  SIGHTGLASS_REPO_ROOT: /app
-  SIGHTGLASS_ENVIRONMENT: ${SIGHTGLASS_ENVIRONMENT:-production}
-  SIGHTGLASS_LOG_LEVEL: ${SIGHTGLASS_LOG_LEVEL:-INFO}
-  SIGHTGLASS_EGRESS_POLICY: ${SIGHTGLASS_EGRESS_POLICY:-deny}
+  BARE_DATABASE_URL: postgresql+psycopg://bare:bare@postgres:5432/bare
+  BARE_REDIS_URL: redis://redis:6379/0
+  BARE_S3_ENDPOINT_URL: http://minio:9000
+  BARE_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-bare}
+  BARE_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-bare}
+  BARE_RUN_ROOT: /var/lib/bare/runs
+  BARE_RUN_ROOT_HOST: ${BARE_RUN_ROOT_HOST:-/var/lib/bare/runs}
+  BARE_REPO_ROOT: /app
+  BARE_ENVIRONMENT: ${BARE_ENVIRONMENT:-production}
+  BARE_LOG_LEVEL: ${BARE_LOG_LEVEL:-INFO}
+  BARE_EGRESS_POLICY: ${BARE_EGRESS_POLICY:-deny}
   # The API demands a token by default. On first start with no tokens the
   # dashboard's setup wizard (opened automatically at http://localhost:3000)
   # mints the first admin one; POST /api/setup/bootstrap does the same for a
   # headless operator.
-  SIGHTGLASS_AUTH_REQUIRED: ${SIGHTGLASS_AUTH_REQUIRED:-true}
+  BARE_AUTH_REQUIRED: ${BARE_AUTH_REQUIRED:-true}
   # CPU quota per analyzer container. The static analyzer parallelises
   # across it; see Settings.analyzer_cpus for the measurements.
-  SIGHTGLASS_ANALYZER_CPUS: ${SIGHTGLASS_ANALYZER_CPUS:-4}
+  BARE_ANALYZER_CPUS: ${BARE_ANALYZER_CPUS:-4}
   # Memory ceiling per analyzer container. A 213 MB installer unpacks to
   # ~69 000 files, which is the shape that pushes against this.
-  SIGHTGLASS_ANALYZER_MEMORY_GB: ${SIGHTGLASS_ANALYZER_MEMORY_GB:-8}
+  BARE_ANALYZER_MEMORY_GB: ${BARE_ANALYZER_MEMORY_GB:-8}
 
 services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: sightglass
-      POSTGRES_PASSWORD: sightglass
-      POSTGRES_DB: sightglass
+      POSTGRES_USER: bare
+      POSTGRES_PASSWORD: bare
+      POSTGRES_DB: bare
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sightglass -d sightglass"]
+      test: ["CMD-SHELL", "pg_isready -U bare -d bare"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -85,8 +85,8 @@ services:
     image: minio/minio:RELEASE.2024-12-18T13-15-44Z
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-sightglass}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-sightglass}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-bare}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-bare}
     volumes:
       - minio-data:/data
     healthcheck:
@@ -104,13 +104,13 @@ services:
       minio:
         condition: service_healthy
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-sightglass}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-sightglass}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-bare}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-bare}
     entrypoint: >
       /bin/sh -c "
       mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
-      mc mb --ignore-existing local/sightglass-artifacts &&
-      mc anonymous set none local/sightglass-artifacts &&
+      mc mb --ignore-existing local/bare-artifacts &&
+      mc anonymous set none local/bare-artifacts &&
       echo 'bucket ready'
       "
     restart: "no"
@@ -129,34 +129,34 @@ services:
   # start a worker with nothing to spawn.
   #
   # Without this, a fresh clone came up entirely healthy and then failed its
-  # first scan with START_FAILED. `sightglass/*:dev` are local-only tags, so the
+  # first scan with START_FAILED. `bare/*:dev` are local-only tags, so the
   # daemon's implicit pull goes to Docker Hub and finds nothing there. The
   # failure surfaced at scan time, not at boot, which is the worst place for it.
   #
   # `make images` and CI build these same services, so the build context and
   # dockerfile for each analyzer are defined here and nowhere else.
   #
-  # The tag follows SIGHTGLASS_ANALYZER_TAG, the same variable
+  # The tag follows BARE_ANALYZER_TAG, the same variable
   # core/sandbox/images.py resolves at scan time, so the image this builds and
   # the image the worker goes looking for cannot disagree.
   #
   # `:-` covers unset and empty, which is where analyzer_tag() also lands. It
   # cannot strip, so a whitespace-only tag exported into a bare
-  # `docker compose up` builds `sightglass/static:   ` while a scan looks for
+  # `docker compose up` builds `bare/static:   ` while a scan looks for
   # `:dev`. Going through `make images` normalises it; there is no way to do it
   # in Compose interpolation.
   #
-  # `pull_policy: build` is not optional. `sightglass/static` parses as a Docker
+  # `pull_policy: build` is not optional. `bare/static` parses as a Docker
   # Hub reference (namespace/repo), and Compose's default policy is to pull an
   # image it does not find locally — which on a fresh machine means Docker Hub,
-  # no such repository, and "pull access denied for sightglass/static". These
+  # no such repository, and "pull access denied for bare/static". These
   # images exist only where they are built, so Compose must never look for them
   # anywhere else. The backend and web services avoid this by having no `image:`
   # at all, which leaves them with unresolvable project-scoped names.
   analyzer-hello:
     build:
       context: sandbox/images/hello
-    image: sightglass/hello:${SIGHTGLASS_ANALYZER_TAG:-dev}
+    image: bare/hello:${BARE_ANALYZER_TAG:-dev}
     pull_policy: build
     # The image's own ENTRYPOINT is the analyzer. Nothing should analyze
     # anything here — this container exists only to make the build happen.
@@ -167,7 +167,7 @@ services:
     build:
       context: .
       dockerfile: sandbox/images/static/Dockerfile
-    image: sightglass/static:${SIGHTGLASS_ANALYZER_TAG:-dev}
+    image: bare/static:${BARE_ANALYZER_TAG:-dev}
     pull_policy: build
     entrypoint: ["/bin/true"]
     restart: "no"
@@ -176,7 +176,7 @@ services:
     build:
       context: .
       dockerfile: sandbox/images/unpack/Dockerfile
-    image: sightglass/unpack:${SIGHTGLASS_ANALYZER_TAG:-dev}
+    image: bare/unpack:${BARE_ANALYZER_TAG:-dev}
     pull_policy: build
     entrypoint: ["/bin/true"]
     restart: "no"
@@ -194,7 +194,7 @@ services:
       - --port
       - "8000"
     ports:
-      - "${SIGHTGLASS_API_PORT:-8000}:8000"
+      - "${BARE_API_PORT:-8000}:8000"
     volumes:
       # Runtime state that must outlive a rebuild: the live LLM config the
       # setup wizard writes, and the provider key store. Everything under /app
@@ -236,7 +236,7 @@ services:
       # Root-equivalent on the host. Deliberate and documented: the worker is
       # the only component that spawns containers. Analyzers never see it.
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${SIGHTGLASS_RUN_ROOT_HOST:-/var/lib/sightglass/runs}:/var/lib/sightglass/runs
+      - ${BARE_RUN_ROOT_HOST:-/var/lib/bare/runs}:/var/lib/bare/runs
       # Shared with the API: the worker is what actually calls the model, so it
       # must read the same config and keys the wizard wrote.
       - backend-data:/app/data
@@ -291,7 +291,7 @@ services:
       - --queues=ghidra,dynamic
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${SIGHTGLASS_RUN_ROOT_HOST:-/var/lib/sightglass/runs}:/var/lib/sightglass/runs
+      - ${BARE_RUN_ROOT_HOST:-/var/lib/bare/runs}:/var/lib/bare/runs
       # Shared with the API: the worker is what actually calls the model, so it
       # must read the same config and keys the wizard wrote.
       - backend-data:/app/data
@@ -341,19 +341,19 @@ services:
       context: ./web
       dockerfile: Dockerfile
     environment:
-      NEXT_PUBLIC_API_URL: ${SIGHTGLASS_PUBLIC_API_URL:-http://localhost:8000}
-      SIGHTGLASS_API_URL: http://api:8000
+      NEXT_PUBLIC_API_URL: ${BARE_PUBLIC_API_URL:-http://localhost:8000}
+      BARE_API_URL: http://api:8000
       # The dashboard's own credential, attached server-side by the proxy
       # route and never sent to the browser. Setting this is optional: with
       # nothing here, opening the dashboard on a fresh stack lands on its
       # setup wizard, which mints the first admin token and persists it to
       # `web-data` below — no `.env` edit, no container restart. Set this
       # only to pin the dashboard to a token you minted yourself.
-      SIGHTGLASS_TOKEN: ${SIGHTGLASS_TOKEN:-}
+      BARE_TOKEN: ${BARE_TOKEN:-}
     volumes:
       - web-data:/app/data
     ports:
-      - "${SIGHTGLASS_WEB_PORT:-3000}:3000"
+      - "${BARE_WEB_PORT:-3000}:3000"
     depends_on:
       # service_started only meant the process had been launched, so the
       # dashboard could come up and proxy to an API that was still migrating.

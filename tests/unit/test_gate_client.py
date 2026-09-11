@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from cli.client import ApiError, SightglassClient, _MultipartBody
+from cli.client import ApiError, BareClient, _MultipartBody
 from cli.gate_output import render_json, render_markdown, render_text
 from core.policy import (
     GateDecision,
@@ -259,21 +259,21 @@ def test_rendering_never_emits_a_raw_secret() -> None:
 # A build agent gets a sentence and an exit code. Anything that reaches it as a
 # Python traceback is a bug in this client, not information: it buries the one
 # actionable line in forty of stack, and the operator cannot tell a broken
-# Sightglass from a broken pipeline. Observed against a real 213 MB scan — a
+# BARE from a broken pipeline. Observed against a real 213 MB scan — a
 # read that stalled after the response headers arrived raised a bare
 # TimeoutError, which is not a URLError and so matched no handler at all.
 
 
 def _client_raising(
     monkeypatch: pytest.MonkeyPatch, exc: BaseException
-) -> SightglassClient:
+) -> BareClient:
     """Fail at the socket, where these errors actually originate."""
 
     def _boom(*args: object, **kwargs: object) -> None:
         raise exc
 
     monkeypatch.setattr(urllib.request, "urlopen", _boom)
-    return SightglassClient("http://example.invalid", token="t", timeout_s=30)
+    return BareClient("http://example.invalid", token="t", timeout_s=30)
 
 
 def test_a_read_timeout_becomes_an_actionable_error_not_a_traceback(

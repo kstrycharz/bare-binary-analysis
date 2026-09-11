@@ -1,4 +1,4 @@
-# CLAUDE.md — Sightglass working document
+# CLAUDE.md — BARE working document
 
 The contract between sessions: current state, open debt, and the rules the code
 is held to. Update at the end of every working session.
@@ -16,7 +16,7 @@ the ADR log.
 
 ## 1. Project overview
 
-Sightglass is a self-hosted, air-gap-capable analysis platform for the binaries
+BARE is a self-hosted, air-gap-capable analysis platform for the binaries
 a company is about to ship — installers, executables, DLLs, firmware images,
 ELF binaries, embedded-device update bundles. It detonates them inside
 disposable Docker sandboxes, reverse engineers them with standard open-source
@@ -49,7 +49,7 @@ with offsets, encoding, and remediation. Optional AI triage classifies them,
 explains individual findings, investigates them agentically with read-only
 tools, and summarises a run. A release policy turns
 those findings into a ship / do-not-ship decision with a meaningful exit code,
-so Sightglass is a build-pipeline stage gate and not only a dashboard.
+so BARE is a build-pipeline stage gate and not only a dashboard.
 
 Deployment is two commands and no file editing — the dashboard's first-run
 wizard mints the API token and optionally connects a model:
@@ -63,8 +63,8 @@ exit, rather than something `make images` has to be remembered for (ADR-0028).
 
 ```bash
 # as a release gate
-uv run sightglass policy init
-uv run sightglass scan dist/installer.exe --sarif sightglass.sarif
+uv run bare policy init
+uv run bare scan dist/installer.exe --sarif bare.sarif
 ```
 
 See [docs/CICD.md](docs/CICD.md) for the pipeline integration design and
@@ -102,7 +102,7 @@ Not yet started: Ghidra and dynamic analysis (M5), MCP servers (M5), and the
 
 **Next milestone: M5 — Ghidra cross-references and dynamic analysis. Reporting
 (SARIF, PDF, CycloneDX) has landed; see `/api/runs/{id}/report.pdf` and
-`/sbom`. `sightglass sbom RUN_ID` exports one for any past run.**
+`/sbom`. `bare sbom RUN_ID` exports one for any past run.**
 
 ---
 
@@ -158,12 +158,12 @@ anything durable to [docs/ADR.md](docs/ADR.md).
 The gate, authentication, and reporting have all landed. What is left is
 mostly about the tool being *lived with* rather than demonstrated.
 
-1. **Gate the gate in this repo's own CI.** Sightglass should scan its own
+1. **Gate the gate in this repo's own CI.** BARE should scan its own
    built artifacts on every release tag. Dogfooding is the fastest way to find
    out which parts of `docs/CICD.md` are wrong, and it is the one claim in the
    README that nothing currently verifies.
 2. **Waiver ergonomics.** The CI output prints finding ids; there is no
-   `sightglass waive <id> --reason ... --expires ...` to append a well-formed
+   `bare waive <id> --reason ... --expires ...` to append a well-formed
    entry. Hand-editing YAML under time pressure is where waivers acquire
    missing owners and absent expiries.
 3. **Plaintext retention needs its TTL.** §9 promises encryption at rest, a
@@ -225,16 +225,16 @@ make down / make clean  # stop / stop and delete volumes
 
 Non-obvious things worth knowing:
 
-- **Analyzer image tags come from `SIGHTGLASS_ANALYZER_TAG`** (default `dev`).
+- **Analyzer image tags come from `BARE_ANALYZER_TAG`** (default `dev`).
   One variable feeds the Makefile, `make.ps1`, and `core/sandbox/images.py`, so
   the build and the orchestrator cannot disagree about which image they mean.
-  `SIGHTGLASS_<NAME>_IMAGE` still takes a full reference and wins, which is how
+  `BARE_<NAME>_IMAGE` still takes a full reference and wins, which is how
   a digest gets pinned.
-- **`SIGHTGLASS_RUN_ROOT` must be an absolute host path.** The worker spawns
+- **`BARE_RUN_ROOT` must be an absolute host path.** The worker spawns
   analyzer containers as siblings via the Docker socket; the daemon resolves
   their bind mounts on the *host*. Mismatch it and analyzers silently get empty
   input directories. See ADR-0007.
-- **The isolation probe is the real test.** `sightglass sandbox hello` reports
+- **The isolation probe is the real test.** `bare sandbox hello` reports
   what the container observed from the inside. Inspecting the daemon's view of
   a container's config proves nothing about whether the config took effect.
 - **A single analyzer test run:**

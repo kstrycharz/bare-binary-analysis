@@ -1,4 +1,4 @@
-# Sightglass
+# BARE
 
 **Scan the artifacts you are about to ship.**
 
@@ -10,7 +10,7 @@ Embedded vendors hardcode provisioning credentials and update-server API keys
 because the device has no other way to bootstrap. An installer bundles a
 `config.default.json` with a real staging token in it.
 
-Sightglass takes the installers, executables, firmware images, and update
+BARE takes the installers, executables, firmware images, and update
 bundles you are about to release, unpacks them inside disposable sandboxes, and
 reverse engineers them with standard open-source tooling to answer two
 questions about the thing you are actually shipping:
@@ -30,7 +30,7 @@ It is self-hosted and air-gap capable. Your artifacts do not leave your network.
 
 ## What it is not
 
-Sightglass is a pre-release supply-chain hygiene tool. It is **not** a malware
+BARE is a pre-release supply-chain hygiene tool. It is **not** a malware
 analysis platform, a competitor-teardown tool, or an exploit development
 environment.
 
@@ -42,7 +42,7 @@ environment.
 - Uploads carry an authorization attestation — you own the artifact, or you are
   contractually authorized to test it — which is recorded in the audit log and
   stamped into every report. Enforcement is a setting
-  (`SIGHTGLASS_REQUIRE_ATTESTATION`), shipped **off** so evaluating the tool has
+  (`BARE_REQUIRE_ATTESTATION`), shipped **off** so evaluating the tool has
   no friction. Turn it on before anyone analyses an artifact they did not build.
 
 See [SECURITY.md](SECURITY.md) for the third-party-artifact (due diligence)
@@ -92,7 +92,7 @@ for others. See ADR-0027.
 
 ## Binary composition analysis
 
-Sightglass reads the bill of materials out of the artifact itself, not out of a
+BARE reads the bill of materials out of the artifact itself, not out of a
 lockfile that may not describe what actually shipped:
 
 - **Bundled package manifests** — `package.json`, Python `.dist-info/METADATA`,
@@ -106,9 +106,9 @@ served as CycloneDX 1.5 from `GET /api/runs/{id}/sbom`, downloadable from the
 run page, or exported from the CLI:
 
 ```bash
-sightglass scan dist/installer.exe --sbom sbom.cdx.json   # during a scan
-sightglass sbom RUN_ID -o sbom.cdx.json                   # any run, later
-sightglass sbom RUN_ID | jq '.components | length'        # stdout by default
+bare scan dist/installer.exe --sbom sbom.cdx.json   # during a scan
+bare sbom RUN_ID -o sbom.cdx.json                   # any run, later
+bare sbom RUN_ID | jq '.components | length'        # stdout by default
 ```
 
 Every component carries how it was identified — a `package.json` declaration
@@ -173,12 +173,12 @@ curl -X POST http://localhost:8000/api/setup/bootstrap
 <http://localhost:8000/docs> has the API.
 
 One setting is worth knowing about before you scan anything real:
-**`SIGHTGLASS_RUN_ROOT_HOST`** must be an absolute *host* path, because the
+**`BARE_RUN_ROOT_HOST`** must be an absolute *host* path, because the
 worker spawns each analyzer as a sibling container through the Docker socket
 and the daemon resolves bind mounts on the host, not inside the worker. The
-default (`/var/lib/sightglass/runs`) is fine on Linux and macOS; on Windows,
+default (`/var/lib/bare/runs`) is fine on Linux and macOS; on Windows,
 copy `.env.example` to `.env` and set it to a Windows path (e.g.
-`C:\sightglass\runs`). Get it wrong and analyzers get empty input directories
+`C:\bare\runs`). Get it wrong and analyzers get empty input directories
 with no error at all — see the comment at the top of
 [docker-compose.yml](docker-compose.yml) and
 [docs/SETUP.md](docs/SETUP.md#2-get-the-code-and-configure).
@@ -192,7 +192,7 @@ make test-integration   # sandbox isolation tests — needs Docker
 ```
 
 Analyzer images build and run as `:dev` by default. For a deployment, set
-`SIGHTGLASS_ANALYZER_TAG` to a version or a git sha — both `make images` and
+`BARE_ANALYZER_TAG` to a version or a git sha — both `make images` and
 the orchestrator read it, so a build and a scan cannot disagree about which
 image they mean.
 
@@ -201,12 +201,12 @@ are identical.
 
 ## Use it as a release gate
 
-The point of scanning a shipped artifact is to stop it shipping. Sightglass
+The point of scanning a shipped artifact is to stop it shipping. BARE
 runs as a pipeline stage between the build and the release:
 
 ```bash
-sightglass policy init                                    # once, per repository
-sightglass scan dist/installer.exe --sarif findings.sarif  # in CI
+bare policy init                                    # once, per repository
+bare scan dist/installer.exe --sarif findings.sarif  # in CI
 ```
 
 It uploads the artifact, waits for the scan, evaluates a policy your repository
@@ -257,7 +257,7 @@ Full detail in [ARCHITECTURE.md](ARCHITECTURE.md) and
 | [CLAUDE.md](CLAUDE.md) | Current status, known issues, conventions |
 | [docs/ADR.md](docs/ADR.md) | Architecture decision log, with rejected alternatives |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Components, pipeline stages, data model |
-| [docs/CICD.md](docs/CICD.md) | Running Sightglass as a CI/CD release gate |
+| [docs/CICD.md](docs/CICD.md) | Running BARE as a CI/CD release gate |
 | [SECURITY.md](SECURITY.md) | Reporting vulnerabilities, responsible use |
 | [THREAT_MODEL.md](THREAT_MODEL.md) | What the sandbox defends against, and what it does not |
 

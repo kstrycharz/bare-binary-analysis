@@ -1,5 +1,5 @@
 [project]
-name = "sightglass"
+name = "bare"
 version = "0.0.1"
 description = "Self-hosted, air-gap-capable shipped-artifact exposure scanner."
 readme = "README.md"
@@ -43,7 +43,7 @@ dev = [
 ]
 
 [project.scripts]
-sightglass = "cli.main:app"
+bare = "cli.main:app"
 
 [build-system]
 requires = ["hatchling"]

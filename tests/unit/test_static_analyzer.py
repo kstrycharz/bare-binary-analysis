@@ -25,10 +25,10 @@ ANALYZER_PATH = REPO_ROOT / "sandbox" / "images" / "static" / "analyzer.py"
 
 
 def _load_analyzer() -> ModuleType:
-    # The analyzer inserts /opt/sightglass on sys.path for its container
+    # The analyzer inserts /opt/bare on sys.path for its container
     # layout; importing it here works because core.rules is already importable
     # from the repo root.
-    spec = importlib.util.spec_from_file_location("sightglass_static_analyzer", ANALYZER_PATH)
+    spec = importlib.util.spec_from_file_location("bare_static_analyzer", ANALYZER_PATH)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -62,12 +62,12 @@ def staged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 class TestWorkerCount:
     def test_small_trees_stay_sequential(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Below the threshold a pool costs more than it saves."""
-        monkeypatch.delenv("SIGHTGLASS_SCAN_WORKERS", raising=False)
+        monkeypatch.delenv("BARE_SCAN_WORKERS", raising=False)
         assert analyzer.scan_worker_count(1) == 1
         assert analyzer.scan_worker_count(analyzer.MIN_FILES_FOR_POOL - 1) == 1
 
     def test_large_trees_use_a_pool(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("SIGHTGLASS_SCAN_WORKERS", raising=False)
+        monkeypatch.delenv("BARE_SCAN_WORKERS", raising=False)
         monkeypatch.setattr(analyzer, "available_cpus", lambda: 8)
         assert analyzer.scan_worker_count(500) == analyzer.MAX_SCAN_WORKERS
 
@@ -75,27 +75,27 @@ class TestWorkerCount:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Eight workers sharing two CPUs is slower than two, not faster."""
-        monkeypatch.delenv("SIGHTGLASS_SCAN_WORKERS", raising=False)
+        monkeypatch.delenv("BARE_SCAN_WORKERS", raising=False)
         monkeypatch.setattr(analyzer, "available_cpus", lambda: 2)
         assert analyzer.scan_worker_count(500) == 2
 
     def test_worker_count_never_exceeds_the_file_count(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.delenv("SIGHTGLASS_SCAN_WORKERS", raising=False)
+        monkeypatch.delenv("BARE_SCAN_WORKERS", raising=False)
         monkeypatch.setattr(analyzer, "available_cpus", lambda: 32)
         # Bounded by MAX_SCAN_WORKERS first, then by the file count below it.
         assert analyzer.scan_worker_count(10) == min(analyzer.MAX_SCAN_WORKERS, 10)
         assert analyzer.scan_worker_count(9) == min(analyzer.MAX_SCAN_WORKERS, 9)
 
     def test_env_override_wins(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("SIGHTGLASS_SCAN_WORKERS", "3")
+        monkeypatch.setenv("BARE_SCAN_WORKERS", "3")
         assert analyzer.scan_worker_count(500) == 3
 
     def test_invalid_override_is_ignored_not_fatal(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("SIGHTGLASS_SCAN_WORKERS", "lots")
+        monkeypatch.setenv("BARE_SCAN_WORKERS", "lots")
         monkeypatch.setattr(analyzer, "available_cpus", lambda: 4)
         assert analyzer.scan_worker_count(500) == 4
 

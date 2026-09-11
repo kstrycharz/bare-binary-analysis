@@ -49,7 +49,7 @@ def request(
 
 
 def multipart(fields: dict[str, str], filename: str, content: bytes) -> tuple[bytes, str]:
-    boundary = "----sightglass-demo-boundary"
+    boundary = "----bare-demo-boundary"
     parts: list[bytes] = []
     for name, value in fields.items():
         header = f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n'
@@ -74,7 +74,7 @@ def wait_for_api(base: str, attempts: int = 60) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Sightglass end-to-end demo")
+    parser = argparse.ArgumentParser(description="BARE end-to-end demo")
     parser.add_argument("--api", default="http://localhost:8000")
     parser.add_argument("--artifact", type=Path, default=DEFAULT_ARTIFACT)
     parser.add_argument("--no-triage", action="store_true", help="skip the LLM triage pass")
@@ -83,7 +83,7 @@ def main() -> int:
     if not args.artifact.is_file():
         raise SystemExit(f"{args.artifact} not found. Run: make corpus")
 
-    print(f"{BOLD}Sightglass demo{RESET}")
+    print(f"{BOLD}BARE demo{RESET}")
     print(f"{DIM}Waiting for the API…{RESET}")
     wait_for_api(args.api)
 

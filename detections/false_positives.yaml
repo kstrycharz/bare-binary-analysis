@@ -7,7 +7,7 @@
 #
 # The bar for adding an entry: it appears verbatim in vendor documentation, an
 # RFC, or a public SDK sample. A customer's own benign value does NOT belong
-# here — that is what `.sightglass-ignore.yaml` suppressions are for, so that
+# here — that is what `.bare-ignore.yaml` suppressions are for, so that
 # one customer's judgement call never suppresses a real finding for another.
 
 known_benign:

@@ -1,6 +1,6 @@
-# Sightglass waivers
+# BARE waivers
 #
-# Copy to `.sightglass/waivers.yaml`. Each entry exempts ONE finding, by its
+# Copy to `.bare/waivers.yaml`. Each entry exempts ONE finding, by its
 # content-derived id, until a date that must be stated.
 #
 # Every field is required by default. That is the point: a waiver is a decision

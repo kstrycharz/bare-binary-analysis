@@ -34,7 +34,7 @@ ALL_QUEUES = (
 
 def create_celery() -> Celery:
     settings = get_settings()
-    app = Celery("sightglass", broker=settings.redis_url, backend=settings.redis_url)
+    app = Celery("bare", broker=settings.redis_url, backend=settings.redis_url)
 
     app.conf.update(
         task_serializer="json",
@@ -55,7 +55,7 @@ def create_celery() -> Celery:
         result_expires=60 * 60 * 24 * 7,
         beat_schedule={
             "reap-orphaned-containers": {
-                "task": "sightglass.reap_containers",
+                "task": "bare.reap_containers",
                 "schedule": float(settings.reaper_interval_seconds),
                 "options": {"queue": QUEUE_CONTROL, "expires": 120},
             },
@@ -64,7 +64,7 @@ def create_celery() -> Celery:
             # becomes of the run instead. Without it a scan queued during a
             # worker restart is orphaned at `queued` for ever.
             "recover-orphaned-runs": {
-                "task": "sightglass.recover_orphaned_runs",
+                "task": "bare.recover_orphaned_runs",
                 "schedule": float(settings.orphan_sweep_interval_seconds),
                 "options": {"queue": QUEUE_CONTROL, "expires": 120},
             },

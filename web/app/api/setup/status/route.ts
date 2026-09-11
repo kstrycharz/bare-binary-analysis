@@ -13,7 +13,7 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.SIGHTGLASS_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.BARE_API_URL ?? "http://localhost:8000";
 
 export async function GET() {
   try {
@@ -25,7 +25,7 @@ export async function GET() {
     // all, redirecting to a wizard that would fail the same way is worse than
     // letting the page render its own "could not reach the API" error.
     return NextResponse.json(
-      { needs_setup: false, error: `could not reach the Sightglass API: ${String(error)}` },
+      { needs_setup: false, error: `could not reach the BARE API: ${String(error)}` },
       { status: 502 },
     );
   }

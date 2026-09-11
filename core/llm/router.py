@@ -70,7 +70,7 @@ def active_config_path() -> Path:
     pointless. The runtime copy lives in a volume and is seeded from the image
     default on first use (see `ensure_runtime_config`).
     """
-    override = os.environ.get("SIGHTGLASS_LLM_CONFIG")
+    override = os.environ.get("BARE_LLM_CONFIG")
     if override:
         return Path(override)
     return Path(get_settings().data_dir) / "llm.yaml"

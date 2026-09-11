@@ -1,4 +1,4 @@
-"""`sightglass sbom RUN_ID`.
+"""`bare sbom RUN_ID`.
 
 `scan --sbom` writes an SBOM as a side effect of scanning. This command covers
 everything after that — attaching a bill of materials to a release built last
@@ -53,7 +53,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> list[str]:
             asked.append(run_id)
             return DOCUMENT
 
-    monkeypatch.setattr("cli.scan_commands.SightglassClient", FakeClient)
+    monkeypatch.setattr("cli.scan_commands.BareClient", FakeClient)
     return asked
 
 
@@ -116,7 +116,7 @@ class TestFailures:
             def get_sbom(self, run_id: str) -> dict[str, Any]:
                 raise ApiError("run not found")
 
-        monkeypatch.setattr("cli.scan_commands.SightglassClient", Failing)
+        monkeypatch.setattr("cli.scan_commands.BareClient", Failing)
         result = runner.invoke(app, ["sbom", "missing-run"])
         assert result.exit_code != 0
         assert "could not fetch the SBOM" in result.output

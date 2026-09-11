@@ -434,7 +434,7 @@ def _summarise(session: Session, run: Run) -> RunSummary:
 
 # A recursive installer unpacks to tens of thousands of artifacts — the NVIDIA
 # AI Workbench setup yields 68 975. Building a Pydantic node for each and
-# serialising the result took 58 seconds per request, and `sightglass scan`
+# serialising the result took 58 seconds per request, and `bare scan`
 # polls this endpoint every 20 seconds for the length of the scan. No browser
 # renders a tree that size either, so the cap costs nothing an operator wanted.
 MAX_TREE_NODES = 500

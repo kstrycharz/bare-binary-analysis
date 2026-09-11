@@ -2,7 +2,7 @@
 #
 # The whole pipeline runs with this file absent or `enabled: false`, and
 # produces a complete, valid report. That is the CI default (§2.5). Nothing
-# here is required for Sightglass to work — it makes findings easier to act on,
+# here is required for BARE to work — it makes findings easier to act on,
 # it does not make them exist.
 #
 # THIS FILE SHIPS DISABLED AND EMPTY, ON PURPOSE.

@@ -2,7 +2,7 @@
 
 If the orchestrator crashes mid-run, its containers keep running, holding
 memory and CPU that the next run needs. The reaper is the backstop: it runs
-periodically, looks at everything labelled ``sightglass.managed``, and removes
+periodically, looks at everything labelled ``bare.managed``, and removes
 whatever belongs to a run that is no longer active or that has outlived the
 maximum age.
 

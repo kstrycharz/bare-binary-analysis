@@ -85,7 +85,7 @@ export function SidebarNav() {
                 strokeLinecap="round"
               />
             </svg>
-            <span className="text-[15px] font-semibold tracking-[-0.012em]">Sightglass</span>
+            <span className="text-[15px] font-semibold tracking-[-0.012em]">BARE</span>
           </div>
           <p className="mt-1.5 text-[11px] leading-tight text-content-subtle">
             Shipped-artifact exposure scanner

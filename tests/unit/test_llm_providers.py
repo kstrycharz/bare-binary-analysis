@@ -38,7 +38,7 @@ KEY = "sk-not-a-real-key-0123456789"
 @pytest.fixture
 def store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     path = tmp_path / "llm-keys.json"
-    monkeypatch.setenv("SIGHTGLASS_LLM_KEY_STORE", str(path))
+    monkeypatch.setenv("BARE_LLM_KEY_STORE", str(path))
     yield path
 
 
@@ -279,9 +279,9 @@ class TestTheRuntimeConfigOutlivesARebuild:
         if live is not None:
             (data / "llm.yaml").write_text(yaml.safe_dump(live), encoding="utf-8")
 
-        monkeypatch.setenv("SIGHTGLASS_DATA_DIR", str(data))
-        monkeypatch.setenv("SIGHTGLASS_REPO_ROOT", str(repo))
-        monkeypatch.delenv("SIGHTGLASS_LLM_CONFIG", raising=False)
+        monkeypatch.setenv("BARE_DATA_DIR", str(data))
+        monkeypatch.setenv("BARE_REPO_ROOT", str(repo))
+        monkeypatch.delenv("BARE_LLM_CONFIG", raising=False)
         get_settings.cache_clear()
         return data
 

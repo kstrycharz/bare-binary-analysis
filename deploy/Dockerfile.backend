@@ -42,20 +42,20 @@ COPY alembic/ ./alembic/
 # The worker talks to the Docker socket, which is root-equivalent on the host
 # (see THREAT_MODEL.md). It is the one component that must, and it is why
 # analyzers get their own hard-isolated containers instead of running here.
-ENV SIGHTGLASS_REPO_ROOT=/app \
+ENV BARE_REPO_ROOT=/app \
     PYTHONPATH=/app
 
-# `sightglass` as a real command. The dependency layer above installs what
+# `bare` as a real command. The dependency layer above installs what
 # pyproject.toml requires but not the project itself, so the console script it
-# declares never existed here — and `docker compose exec api sightglass token
+# declares never existed here — and `docker compose exec api bare token
 # create ...`, the documented way to bootstrap credentials, failed with
 # "executable file not found".
 #
 # A shim rather than `pip install .`: the source already lives at /app on
 # PYTHONPATH, and a second copy in site-packages turns every bug report into
 # "which of the two is actually running?".
-RUN printf '#!/bin/sh\nexec python -m cli.main "$@"\n' > /usr/local/bin/sightglass \
- && chmod +x /usr/local/bin/sightglass
+RUN printf '#!/bin/sh\nexec python -m cli.main "$@"\n' > /usr/local/bin/bare \
+ && chmod +x /usr/local/bin/bare
 
 EXPOSE 8000
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -24,7 +24,7 @@ Please do not run destructive tests against infrastructure you do not own.
 
 ## Responsible use
 
-Sightglass analyses artifacts you own or are contractually authorized to test.
+BARE analyses artifacts you own or are contractually authorized to test.
 Every upload requires an attestation recording the attesting identity, a
 timestamp, and a free-text authorization reference. That record is written to an
 append-only audit log and printed in every report. It is a real gate, not a
@@ -45,14 +45,14 @@ submitting a third-party artifact:
 - Get authorization in writing, and record its reference in the attestation.
   "Signed diligence agreement, Project Ares, 2026-03-14" is a useful audit
   record. "yes" is not.
-- Treat any finding as confidential to the artifact's owner. If Sightglass
+- Treat any finding as confidential to the artifact's owner. If BARE
   surfaces a live credential in someone else's product, the right move is
   coordinated disclosure to that vendor — not publication, and not use.
 - Do not use findings to compete, to reimplement protected functionality, or to
   access systems you are not authorized to access. A hardcoded credential you
   found is still a credential you may not use.
 
-Sightglass records the attestation precisely so that this decision is
+BARE records the attestation precisely so that this decision is
 deliberate, attributable, and auditable. It does not, and cannot, verify that
 your authorization is real.
 
@@ -85,7 +85,7 @@ A tool that finds secrets is itself a concentrated store of secrets. Therefore:
 - Every upload, config change, plaintext reveal, LLM call, export, and
   suppression is written to an append-only, exportable audit log.
 
-If Sightglass finds a live credential in your artifact, **rotate it.** Removing
+If BARE finds a live credential in your artifact, **rotate it.** Removing
 it from the next build is not sufficient — the version already shipped is still
 out there, and the finding is evidence it was exposed.
 

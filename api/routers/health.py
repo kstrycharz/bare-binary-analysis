@@ -12,14 +12,14 @@ from typing import Any
 
 from fastapi import APIRouter, Response, status
 
-from core.config import SIGHTGLASS_VERSION, Settings, get_settings
+from core.config import BARE_VERSION, Settings, get_settings
 
 router = APIRouter(tags=["health"])
 
 
 @router.get("/healthz", summary="Liveness probe")
 def healthz() -> dict[str, str]:
-    return {"status": "ok", "version": SIGHTGLASS_VERSION}
+    return {"status": "ok", "version": BARE_VERSION}
 
 
 @router.get("/readyz", summary="Readiness probe")
@@ -43,7 +43,7 @@ def readyz(response: Response) -> dict[str, Any]:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return {
         "ready": ready,
-        "version": SIGHTGLASS_VERSION,
+        "version": BARE_VERSION,
         "checks": checks,
         "advisory": {"sandbox": _check_sandbox(settings)},
     }

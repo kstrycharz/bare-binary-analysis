@@ -136,7 +136,7 @@ class EgressPolicyGuard:
         if not self._allow_egress:
             raise EgressBlocked(
                 f"egress policy is 'deny' and {host} is not local; "
-                "set SIGHTGLASS_EGRESS_POLICY=allow to permit cloud providers"
+                "set BARE_EGRESS_POLICY=allow to permit cloud providers"
             )
         if self._allowed_hosts and host not in self._allowed_hosts:
             raise EgressBlocked(
@@ -163,7 +163,7 @@ class EgressPolicyGuard:
         if not self._allow_egress:
             raise EgressBlocked(
                 f"egress policy is 'deny' and {description} is a hosted provider; "
-                "set SIGHTGLASS_EGRESS_POLICY=allow to permit cloud providers"
+                "set BARE_EGRESS_POLICY=allow to permit cloud providers"
             )
         if self._allowed_hosts:
             raise EgressBlocked(

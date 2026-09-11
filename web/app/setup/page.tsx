@@ -113,7 +113,7 @@ function TokenStep({ onDone }: { onDone: () => void }) {
 
   return (
     <Shell
-      title="Set up Sightglass"
+      title="Set up BARE"
       intro="Step 1 of 2. The API requires a credential and none exists yet. This runs once — it mints the first admin token, saves it for the dashboard to use from now on, and shows it to you a single time."
     >
       <Panel>
@@ -123,7 +123,7 @@ function TokenStep({ onDone }: { onDone: () => void }) {
               <p className="text-[13px] leading-relaxed text-content-muted">
                 You will also want this token if you plan to use the CLI or a CI
                 pipeline directly (
-                <span className="font-mono text-xs">sightglass scan --token …</span>
+                <span className="font-mono text-xs">bare scan --token …</span>
                 ) — the dashboard cannot hand it back to you a second time, so copy
                 it somewhere safe when it appears below.
               </p>
@@ -148,7 +148,7 @@ function TokenStep({ onDone }: { onDone: () => void }) {
               </div>
               <p className="text-[11.5px] leading-relaxed text-content-subtle">
                 This is an admin-scoped token. Mint a narrower one for CI (
-                <span className="font-mono">sightglass token create ci --scope ci</span>
+                <span className="font-mono">bare token create ci --scope ci</span>
                 ) and keep this one for the dashboard alone.
               </p>
               <Button variant="primary" onClick={onDone}>
@@ -222,7 +222,7 @@ function ModelStep() {
     return (
       <Shell
         title="Model connected"
-        intro="Sightglass will use it to triage findings, explain them, and summarise runs. You can change any of this later in Settings."
+        intro="BARE will use it to triage findings, explain them, and summarise runs. You can change any of this later in Settings."
       >
         <Panel>
           <div className="space-y-3 px-4 py-4">
@@ -246,7 +246,7 @@ function ModelStep() {
   return (
     <Shell
       title="Connect a model"
-      intro="Step 2 of 2, and entirely optional. Sightglass is deterministic-first: every finding comes from a rule, and a scan produces a complete report with no model configured at all. A model adds triage, explanations, and run summaries on top."
+      intro="Step 2 of 2, and entirely optional. BARE is deterministic-first: every finding comes from a rule, and a scan produces a complete report with no model configured at all. A model adds triage, explanations, and run summaries on top."
     >
       <Panel
         title="Providers"

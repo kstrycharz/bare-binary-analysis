@@ -1,4 +1,4 @@
-"""Sightglass API application factory."""
+"""BARE API application factory."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ import structlog
 from fastapi import FastAPI
 
 from api.routers import findings, gate, health, runs, settings, setup
-from core.config import SIGHTGLASS_VERSION, get_settings
+from core.config import BARE_VERSION, get_settings
 from core.logging import configure_logging
 
 log = structlog.get_logger(__name__)
 
 DESCRIPTION = """
-Sightglass analyses the artifacts you are about to ship — installers,
+BARE analyses the artifacts you are about to ship — installers,
 executables, firmware images — for exposed secrets, sensitive data, and
 unintended IP disclosure.
 
@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(level=app_settings.log_level, json_output=app_settings.log_json)
     log.info(
         "api.startup",
-        version=SIGHTGLASS_VERSION,
+        version=BARE_VERSION,
         environment=app_settings.environment,
         sandbox_driver=app_settings.sandbox_driver,
         egress_policy=app_settings.egress_policy,
@@ -71,7 +71,7 @@ def _announce_auth(auth_required: bool) -> None:
         log.warning(
             "api.auth_disabled",
             detail=(
-                "SIGHTGLASS_AUTH_REQUIRED is false: the API accepts unauthenticated "
+                "BARE_AUTH_REQUIRED is false: the API accepts unauthenticated "
                 "requests. Acceptable only for a local single-user stack."
             ),
         )
@@ -98,9 +98,9 @@ def _announce_auth(auth_required: bool) -> None:
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Sightglass",
+        title="BARE",
         description=DESCRIPTION,
-        version=SIGHTGLASS_VERSION,
+        version=BARE_VERSION,
         lifespan=lifespan,
     )
     # CORS is deliberately absent: the dashboard is served same-origin in the

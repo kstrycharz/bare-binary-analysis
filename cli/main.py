@@ -1,6 +1,6 @@
-"""The ``sightglass`` command-line interface.
+"""The ``bare`` command-line interface.
 
-M0 exposes the sandbox operations only. ``sightglass scan`` lands in M1 once
+M0 exposes the sandbox operations only. ``bare scan`` lands in M1 once
 there is an ingest pipeline for it to drive.
 """
 
@@ -15,7 +15,7 @@ from typing import Annotated
 
 import typer
 
-from core.config import SIGHTGLASS_VERSION, get_settings
+from core.config import BARE_VERSION, get_settings
 from core.logging import configure_logging
 
 
@@ -33,7 +33,7 @@ def _use_utf8_console() -> None:
 _use_utf8_console()
 
 app = typer.Typer(
-    name="sightglass",
+    name="bare",
     help="Scan the artifacts you are about to ship for exposed secrets and IP.",
     no_args_is_help=True,
     add_completion=False,
@@ -41,7 +41,7 @@ app = typer.Typer(
 sandbox_app = typer.Typer(help="Sandbox runtime operations.", no_args_is_help=True)
 app.add_typer(sandbox_app, name="sandbox")
 
-# The CI-facing surface. Imported eagerly because `sightglass scan --help` on a
+# The CI-facing surface. Imported eagerly because `bare scan --help` on a
 # build agent must not depend on a database or a Docker socket being reachable.
 from cli.scan_commands import gate, policy_app, sbom, scan  # noqa: E402
 from cli.token_commands import token_app  # noqa: E402
@@ -55,8 +55,8 @@ app.add_typer(token_app, name="token")
 
 @app.command()
 def version() -> None:
-    """Print the Sightglass version."""
-    typer.echo(SIGHTGLASS_VERSION)
+    """Print the BARE version."""
+    typer.echo(BARE_VERSION)
 
 
 @sandbox_app.command("health")
@@ -115,7 +115,7 @@ def sandbox_hello(
     # Analyzers run as uid 10001 and must be able to write results.
     _make_writable(results)
     (staging / "sample.txt").write_text(
-        "Sightglass reference input. Contains no secrets.\n", encoding="utf-8"
+        "BARE reference input. Contains no secrets.\n", encoding="utf-8"
     )
 
     driver = driver_from_settings()

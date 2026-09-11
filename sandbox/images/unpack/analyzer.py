@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, "/opt/sightglass")
+sys.path.insert(0, "/opt/bare")
 
 from core.unpack import ExtractionBudget, Extractor, summarise
 
@@ -67,7 +67,7 @@ def find_artifact() -> Path | None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Sightglass unpack analyzer")
+    parser = argparse.ArgumentParser(description="BARE unpack analyzer")
     parser.add_argument("--max-depth", type=int, default=8)
     parser.add_argument(
         "--max-files",

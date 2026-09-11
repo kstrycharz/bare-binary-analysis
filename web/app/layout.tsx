@@ -23,7 +23,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sightglass",
+  title: "BARE",
   description:
     "Shipped-artifact exposure scanner: secrets, sensitive data, and IP disclosure in the binaries you ship.",
 };

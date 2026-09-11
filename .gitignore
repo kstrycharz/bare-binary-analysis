@@ -45,9 +45,9 @@ tests/corpus/out/
 # The release policy and its waivers are COMMITTED on purpose: the team that
 # owns the artifact owns the definition of "shippable", and the file's git
 # history is the audit trail for who weakened the gate and when (ADR-0019).
-# Only local scratch under .sightglass/ is ignored.
-.sightglass/cache/
-.sightglass/*.local.yaml
+# Only local scratch under .bare/ is ignored.
+.bare/cache/
+.bare/*.local.yaml
 
 # Scan output. These are per-run reports about a specific binary — they name
 # internal paths, hostnames, and masked credentials, so they are the last thing
@@ -55,8 +55,8 @@ tests/corpus/out/
 # deliberate act; name it explicitly rather than letting the glob catch it.
 *.sarif
 *.cdx.json
-sightglass-report-*.pdf
-sightglass-report-*.html
+bare-report-*.pdf
+bare-report-*.html
 
 # Working material from building this, not source. Kept locally; none of it
 # belongs in a clone.

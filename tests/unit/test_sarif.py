@@ -43,7 +43,7 @@ def test_envelope_is_valid_sarif() -> None:
     assert log["version"] == SARIF_VERSION
     assert log["$schema"].endswith("sarif-2.1.0.json")
     driver = log["runs"][0]["tool"]["driver"]
-    assert driver["name"] == "Sightglass"
+    assert driver["name"] == "BARE"
     assert driver["version"] == "0.0.1"
 
 
@@ -70,14 +70,14 @@ def test_severity_maps_to_level_and_security_severity() -> None:
 
     rules = {r["id"]: r for r in log["runs"][0]["tool"]["driver"]["rules"]}
     assert rules["aws_secret_key"]["properties"]["security-severity"] == "9.5"
-    assert rules["aws_secret_key"]["properties"]["sightglass-severity"] == "critical"
+    assert rules["aws_secret_key"]["properties"]["bare-severity"] == "critical"
 
 
 def test_fingerprint_is_the_content_derived_finding_id() -> None:
     """Stable ids are what stop a service reopening the same finding forever."""
     log = build_sarif([finding("stable-id")], tool_version="0.0.1")
     result = log["runs"][0]["results"][0]
-    assert result["partialFingerprints"]["sightglassFindingId"] == "stable-id"
+    assert result["partialFingerprints"]["bareFindingId"] == "stable-id"
 
 
 def test_byte_offset_is_used_rather_than_a_fabricated_line() -> None:

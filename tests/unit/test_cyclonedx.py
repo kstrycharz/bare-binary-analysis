@@ -84,7 +84,7 @@ class TestTheDocumentIsWellFormed:
 
     def test_the_tool_identifies_itself(self) -> None:
         tools = sbom()["metadata"]["tools"]["components"]
-        assert tools[0]["name"] == "Sightglass"
+        assert tools[0]["name"] == "BARE"
         assert tools[0]["version"] == "0.1.0"
 
     def test_an_empty_inventory_is_still_a_valid_document(self) -> None:
@@ -126,13 +126,13 @@ class TestEvidenceNotAssertion:
     def test_the_confidence_is_also_readable_as_a_property(self) -> None:
         entry = sbom(component(confidence=Confidence.INFERRED))["components"][0]
         properties = {p["name"]: p["value"] for p in entry["properties"]}
-        assert properties["sightglass:confidence"] == "inferred"
+        assert properties["bare:confidence"] == "inferred"
 
     def test_the_location_travels_with_the_component(self) -> None:
         """The single most useful field for anyone who has to remove it."""
         entry = sbom(component(path_in_tree="app/lib/zlib.dll"))["components"][0]
         properties = {p["name"]: p["value"] for p in entry["properties"]}
-        assert properties["sightglass:path"] == "app/lib/zlib.dll"
+        assert properties["bare:path"] == "app/lib/zlib.dll"
 
     def test_evidence_falls_back_to_the_path(self) -> None:
         """A component identified without a named evidence field still has to
@@ -169,8 +169,8 @@ class TestItSaysWhenTheInventoryIsPartial:
     def test_a_complete_walk_says_so(self) -> None:
         document = sbom(component())
         properties = _root_properties(document)
-        assert properties["sightglass:inventory_complete"] == "true"
-        assert properties["sightglass:files_examined"] == "42"
+        assert properties["bare:inventory_complete"] == "true"
+        assert properties["bare:files_examined"] == "42"
 
     def test_a_truncated_walk_is_never_presented_as_complete(self) -> None:
         """An inventory presented as complete when it is not is worse than no
@@ -180,7 +180,7 @@ class TestItSaysWhenTheInventoryIsPartial:
                 components=(component(),), files_examined=42, truncated=True
             )
         )
-        assert _root_properties(document)["sightglass:inventory_complete"] == "false"
+        assert _root_properties(document)["bare:inventory_complete"] == "false"
 
 
 class TestItIsReproducible:

@@ -234,8 +234,8 @@ class TestCycloneDx:
         properties = {
             p["name"]: p["value"] for p in document["metadata"]["component"]["properties"]
         }
-        assert properties["sightglass:inventory_complete"] == "true"
-        assert properties["sightglass:files_examined"] == "1570"
+        assert properties["bare:inventory_complete"] == "true"
+        assert properties["bare:files_examined"] == "1570"
 
     def test_serialisation_is_deterministic(self, document: dict) -> None:
         assert dump_sbom(document) == dump_sbom(document)

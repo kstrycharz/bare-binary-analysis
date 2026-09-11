@@ -43,7 +43,7 @@ def engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Engine]:
     would run against a second, empty database and the assertions would pass
     for the wrong reason.
     """
-    url = f"sqlite:///{tmp_path / 'sightglass.db'}"
+    url = f"sqlite:///{tmp_path / 'bare.db'}"
     active = create_engine(url, future=True)
     monkeypatch.setattr(db_module, "get_engine", lambda: active)
     yield active

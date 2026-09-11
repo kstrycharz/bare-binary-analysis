@@ -1,4 +1,4 @@
-# Sightglass release gate — Azure DevOps
+# BARE release gate — Azure DevOps
 
 trigger:
   tags:
@@ -19,24 +19,24 @@ steps:
     displayName: Build
 
   # Not on PyPI yet — pin a tag or use an internal feed.
-  - script: pip install "sightglass @ git+https://dev.azure.com/org/sightglass@v0.0.1"
-    displayName: Install Sightglass CLI
+  - script: pip install "bare @ git+https://dev.azure.com/org/bare@v0.0.1"
+    displayName: Install BARE CLI
 
   # The attestation fills itself in from BUILD_REQUESTEDFOR and BUILD_BUILDURI.
   - script: |
-      sightglass scan "$(artifact)" ^
-        --sarif "$(Build.ArtifactStagingDirectory)/sightglass.sarif" ^
-        --json  "$(Build.ArtifactStagingDirectory)/sightglass.json" ^
+      bare scan "$(artifact)" ^
+        --sarif "$(Build.ArtifactStagingDirectory)/bare.sarif" ^
+        --json  "$(Build.ArtifactStagingDirectory)/bare.json" ^
         --timeout 1800
-    displayName: Sightglass release gate
+    displayName: BARE release gate
     env:
-      SIGHTGLASS_API_URL: $(SightglassApiUrl)
+      BARE_API_URL: $(BareApiUrl)
       # A ci-scoped token; see docs/CICD.md section 4.
-      SIGHTGLASS_TOKEN: $(SightglassToken)
+      BARE_TOKEN: $(BareToken)
 
   # `always()` — the verdict is most worth keeping on the run that failed.
-  - publish: $(Build.ArtifactStagingDirectory)/sightglass.json
-    artifact: sightglass-verdict
+  - publish: $(Build.ArtifactStagingDirectory)/bare.json
+    artifact: bare-verdict
     condition: always()
     displayName: Publish verdict
 

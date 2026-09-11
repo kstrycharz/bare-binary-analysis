@@ -3,7 +3,7 @@
 # Build context is the repo root, because the image shares core/unpack with the
 # host so the extraction logic under test is the extraction logic that runs.
 #
-#   docker build -f sandbox/images/unpack/Dockerfile -t sightglass/unpack:dev .
+#   docker build -f sandbox/images/unpack/Dockerfile -t bare/unpack:dev .
 #
 # This container opens untrusted archives, which makes it the most exposed
 # component in the pipeline. It gets the same boundary as every other analyzer
@@ -26,11 +26,11 @@ RUN groupadd --gid 10001 analyzer \
  && mkdir -p /input /output /work \
  && chown analyzer:analyzer /work
 
-COPY --chown=root:root core/__init__.py  /opt/sightglass/core/__init__.py
-COPY --chown=root:root core/vocab.py     /opt/sightglass/core/vocab.py
-COPY --chown=root:root core/unpack/      /opt/sightglass/core/unpack/
-COPY --chown=root:root sandbox/images/unpack/analyzer.py /opt/sightglass/analyzer.py
-RUN chmod -R a-w /opt/sightglass
+COPY --chown=root:root core/__init__.py  /opt/bare/core/__init__.py
+COPY --chown=root:root core/vocab.py     /opt/bare/core/vocab.py
+COPY --chown=root:root core/unpack/      /opt/bare/core/unpack/
+COPY --chown=root:root sandbox/images/unpack/analyzer.py /opt/bare/analyzer.py
+RUN chmod -R a-w /opt/bare
 
 USER 10001:10001
 WORKDIR /work
@@ -39,8 +39,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONHASHSEED=0
 
-ENTRYPOINT ["python3", "/opt/sightglass/analyzer.py"]
+ENTRYPOINT ["python3", "/opt/bare/analyzer.py"]
 
-LABEL org.opencontainers.image.title="sightglass-unpack" \
+LABEL org.opencontainers.image.title="bare-unpack" \
       org.opencontainers.image.description="Recursive container extraction with hard budgets" \
       org.opencontainers.image.licenses="Apache-2.0"

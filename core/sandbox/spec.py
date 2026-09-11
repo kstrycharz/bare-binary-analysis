@@ -1,6 +1,6 @@
 """Typed sandbox specification.
 
-Every analyzer container in Sightglass is described by a :class:`SandboxSpec`.
+Every analyzer container in BARE is described by a :class:`SandboxSpec`.
 The spec is the *only* way to ask for a container: drivers accept a spec and
 nothing else. This exists so that the isolation posture is declared in one
 reviewable place rather than smeared across ``**kwargs`` at a dozen call sites,
@@ -201,9 +201,9 @@ class SandboxSpec:
     def labels(self) -> dict[str, str]:
         """Labels the reaper uses to find orphaned containers."""
         return {
-            "sightglass.run": self.run_id,
-            "sightglass.analyzer": self.analyzer,
-            "sightglass.managed": "true",
+            "bare.run": self.run_id,
+            "bare.analyzer": self.analyzer,
+            "bare.managed": "true",
         }
 
     def validate(self) -> None:

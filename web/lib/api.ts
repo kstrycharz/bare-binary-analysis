@@ -23,7 +23,7 @@ import type { Severity } from "./severity";
 export { SEVERITY_ORDER } from "./severity";
 export type { Severity };
 
-const SERVER_API = process.env.SIGHTGLASS_API_URL ?? "http://localhost:8000";
+const SERVER_API = process.env.BARE_API_URL ?? "http://localhost:8000";
 
 export function apiUrl(path: string): string {
   return typeof window === "undefined" ? `${SERVER_API}${path}` : path;
@@ -61,7 +61,7 @@ export interface Stage {
 }
 
 export interface Manifest {
-  sightglass_version: string;
+  bare_version: string;
   artifact_sha256: string;
   rule_pack_version: string;
   rule_pack_hash: string;

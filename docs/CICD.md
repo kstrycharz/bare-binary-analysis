@@ -1,6 +1,6 @@
-# Sightglass as a release gate
+# BARE as a release gate
 
-How Sightglass sits in a build pipeline: the build produces an artifact, the
+How BARE sits in a build pipeline: the build produces an artifact, the
 artifact is scanned, and the scan decides whether the release proceeds.
 
 This document is the integration design and the reference for wiring it up.
@@ -32,7 +32,7 @@ For running the platform itself, see [SETUP.md](SETUP.md).
 One command does the middle two boxes:
 
 ```bash
-sightglass scan dist/installer.exe --sarif sightglass.sarif
+bare scan dist/installer.exe --sarif bare.sarif
 ```
 
 It uploads, waits, evaluates the policy, writes the reports, and exits with a
@@ -95,9 +95,9 @@ model's judgement to count can opt in per policy.
 ## 3. Setup, once per repository
 
 ```bash
-sightglass policy init          # writes .sightglass/policy.yaml
-sightglass policy validate      # confirms it parses and prints what it enforces
-git add .sightglass/ && git commit -m "chore: add release policy"
+bare policy init          # writes .bare/policy.yaml
+bare policy validate      # confirms it parses and prints what it enforces
+git add .bare/ && git commit -m "chore: add release policy"
 ```
 
 The policy lives in the repository that produces the artifact, not in the
@@ -105,7 +105,7 @@ scanner's configuration. The team that owns the binary owns the definition of
 "shippable", and weakening it should require a pull request somebody approves.
 The file's git history is the audit trail for that.
 
-### `.sightglass/policy.yaml`
+### `.bare/policy.yaml`
 
 ```yaml
 version: 1
@@ -131,7 +131,7 @@ waivers:
   require_reason: true
 ```
 
-### `.sightglass/waivers.yaml`
+### `.bare/waivers.yaml`
 
 ```yaml
 waivers:
@@ -156,7 +156,7 @@ The verdict is a separate call from the scan (ADR-0015), so a run can be
 re-evaluated under a different policy without uploading the artifact again:
 
 ```bash
-sightglass gate <run-id> --policy .sightglass/release-policy.yaml
+bare gate <run-id> --policy .bare/release-policy.yaml
 ```
 
 Two uses. A policy fix should not cost a twenty-minute scan of a 2 GB
@@ -199,14 +199,14 @@ Store the token it returns, then mint a scoped one for the pipeline and revoke
 the bootstrap:
 
 ```bash
-docker compose exec api sightglass token create ci-pipeline --scope ci --expires-in-days 90
-docker compose exec api sightglass token revoke bootstrap
+docker compose exec api bare token create ci-pipeline --scope ci --expires-in-days 90
+docker compose exec api bare token revoke bootstrap
 ```
 
 (Skip the `dashboard` token step from earlier versions of this doc — the
 dashboard now mints and stores its own via the setup wizard.)
 
-`sightglass token` talks to the database, not the API, and so runs on the
+`bare token` talks to the database, not the API, and so runs on the
 server. That is deliberate: an endpoint that mints credentials is a
 privilege-escalation target, and creating the first token must not require
 already having one.
@@ -214,15 +214,15 @@ already having one.
 ### Using it
 
 ```bash
-export SIGHTGLASS_TOKEN=sgt_...      # from your CI secret store
-sightglass scan dist/installer.exe
+export BARE_TOKEN=bare_...      # from your CI secret store
+bare scan dist/installer.exe
 ```
 
 `--token` works too, but prefer the environment variable: an argument shows up
 in process listings and in the build log's command echo.
 
 The token is sent as `Authorization: Bearer`. Where a proxy strips that header,
-`X-Sightglass-Token` is accepted as well.
+`X-Bare-Token` is accepted as well.
 
 ### What the responses mean
 
@@ -241,7 +241,7 @@ Tokens carry an optional expiry and a `last_used_at` you can check before
 retiring one:
 
 ```bash
-docker compose exec api sightglass token list
+docker compose exec api bare token list
 ```
 
 Revocation is a flag, never a delete — "who could reach this API in March, and
@@ -259,20 +259,20 @@ Working workflows live in [`examples/ci/`](../examples/ci/). Summaries follow.
 - name: Build
   run: msbuild /p:Configuration=Release
 
-- name: Sightglass release gate
+- name: BARE release gate
   env:
-    SIGHTGLASS_API_URL: ${{ secrets.SIGHTGLASS_API_URL }}
-    SIGHTGLASS_TOKEN: ${{ secrets.SIGHTGLASS_TOKEN }}
+    BARE_API_URL: ${{ secrets.BARE_API_URL }}
+    BARE_TOKEN: ${{ secrets.BARE_TOKEN }}
   run: |
-    sightglass scan dist/installer.exe \
-      --sarif sightglass.sarif \
-      --json  sightglass.json
+    bare scan dist/installer.exe \
+      --sarif bare.sarif \
+      --json  bare.json
 
 - name: Upload to code scanning
   if: always()
   uses: github/codeql-action/upload-sarif@v3
   with:
-    sarif_file: sightglass.sarif
+    sarif_file: bare.sarif
 ```
 
 `if: always()` on the upload matters: the findings are most worth seeing on the
@@ -289,7 +289,7 @@ people actually look after a red build.
 release-gate:
   stage: verify
   script:
-    - sightglass scan dist/installer.exe --sarif gl-sast-report.json
+    - bare scan dist/installer.exe --sarif gl-sast-report.json
   artifacts:
     when: always
     reports:
@@ -301,8 +301,8 @@ Attestation comes from `GITLAB_USER_LOGIN` and `CI_PIPELINE_URL`.
 ### Azure DevOps
 
 ```yaml
-- script: sightglass scan $(Build.ArtifactStagingDirectory)/installer.exe --json verdict.json
-  displayName: Sightglass release gate
+- script: bare scan $(Build.ArtifactStagingDirectory)/installer.exe --json verdict.json
+  displayName: BARE release gate
 ```
 
 Attestation comes from `BUILD_REQUESTEDFOR` and `BUILD_BUILDURI`.
@@ -312,7 +312,7 @@ Attestation comes from `BUILD_REQUESTEDFOR` and `BUILD_BUILDURI`.
 ```groovy
 stage('Release gate') {
   steps {
-    sh 'sightglass scan dist/installer.exe --json verdict.json'
+    sh 'bare scan dist/installer.exe --json verdict.json'
   }
 }
 ```
@@ -356,7 +356,7 @@ signed and published.**
   resource embedding, and obfuscation all run after compilation, and all three
   are places a secret gets baked in. Scanning the pre-packaging executable
   misses exactly what the packaging step added.
-- *On the exact bytes that ship.* Sightglass hashes what it receives and stamps
+- *On the exact bytes that ship.* BARE hashes what it receives and stamps
   the SHA-256 into the run manifest. If the published artifact's hash does not
   match the scanned one, the gate's verdict was about a different file.
 
@@ -392,7 +392,7 @@ file is uploaded to a code-scanning service and retained long past the run.
 | Gate passes but findings exist | `new_only` with inherited findings | Working as designed. Check the INHERITED count |
 | Everything is new on the first run | No baseline yet | Expected. The first scan establishes it |
 
-The one anti-pattern worth naming: `sightglass scan ... || true`. It converts
+The one anti-pattern worth naming: `bare scan ... || true`. It converts
 a gate into a log line. If the gate is too noisy to enforce, fix the policy in
 the file where that decision is reviewable — do not neutralise it in a shell.
 
@@ -423,9 +423,9 @@ Honest list, so nobody plans around something that does not exist:
   platform's own step.
 - **Reporting beyond SARIF** (PDF, CycloneDX) is M4.
 - **The CLI is not published to a package index.** The examples below show
-  `pip install sightglass` as the shape the install step will take; today a
+  `pip install bare` as the shape the install step will take; today a
   runner installs it from the repository (`pip install
-  git+https://your-host/sightglass@vX.Y.Z`) or from a wheel built with
+  git+https://your-host/bare@vX.Y.Z`) or from a wheel built with
   `uv build` and pushed to an internal index. Pin a tag either way — a release
   gate that silently updates itself is a release gate whose verdict is not
   reproducible.

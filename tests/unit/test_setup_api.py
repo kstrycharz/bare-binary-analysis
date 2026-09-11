@@ -25,7 +25,7 @@ from core.models.base import Base
 
 @pytest.fixture(autouse=True)
 def _auth_on(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    monkeypatch.setenv("SIGHTGLASS_AUTH_REQUIRED", "true")
+    monkeypatch.setenv("BARE_AUTH_REQUIRED", "true")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -80,7 +80,7 @@ class TestBootstrap:
         response = client.post("/api/setup/bootstrap")
         assert response.status_code == 201
         body = response.json()
-        assert body["token"].startswith("sgt_")
+        assert body["token"].startswith("bare_")
         assert body["name"]
 
     def test_the_minted_token_actually_authenticates(self, client: TestClient) -> None:

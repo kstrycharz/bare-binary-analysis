@@ -25,7 +25,7 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, "/opt/sightglass")
+sys.path.insert(0, "/opt/bare")
 
 from core.composition import inventory as build_inventory
 from core.rules import RulePack, load_rule_pack, scan_file, sweep
@@ -200,13 +200,13 @@ def available_cpus() -> int:
 
 
 def scan_worker_count(artifact_count: int) -> int:
-    """How many processes to scan with. ``SIGHTGLASS_SCAN_WORKERS`` overrides."""
-    override = os.environ.get("SIGHTGLASS_SCAN_WORKERS", "").strip()
+    """How many processes to scan with. ``BARE_SCAN_WORKERS`` overrides."""
+    override = os.environ.get("BARE_SCAN_WORKERS", "").strip()
     if override:
         try:
             return max(1, min(int(override), artifact_count))
         except ValueError:
-            print(f"ignoring invalid SIGHTGLASS_SCAN_WORKERS={override!r}", file=sys.stderr)
+            print(f"ignoring invalid BARE_SCAN_WORKERS={override!r}", file=sys.stderr)
     if artifact_count < MIN_FILES_FOR_POOL:
         return 1
     return max(1, min(MAX_SCAN_WORKERS, available_cpus(), artifact_count))
@@ -376,7 +376,7 @@ def collect_residue(artifacts: list[Path], pack: Any, limit: int) -> list[dict[s
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Sightglass static analyzer")
+    parser = argparse.ArgumentParser(description="BARE static analyzer")
     parser.add_argument("--min-string-length", type=int, default=MIN_STRING_LENGTH)
     parser.add_argument(
         "--workers",
@@ -485,7 +485,7 @@ def main(argv: list[str] | None = None) -> int:
         "rule_pack": {"version": pack.version, "hash": pack.hash},
         "tool_versions": {
             "python": platform.python_version(),
-            "sightglass_scanner": str(SCHEMA_VERSION),
+            "bare_scanner": str(SCHEMA_VERSION),
         },
         "duration_s": round(time.monotonic() - started, 3),
         "plaintext_included": args.include_plaintext,

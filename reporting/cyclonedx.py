@@ -51,7 +51,7 @@ def _serial(run_id: str) -> str:
     CycloneDX wants a UUID; deriving it from the run id keeps the document
     reproducible while staying unique per run.
     """
-    digest = hashlib.sha256(f"sightglass:{run_id}".encode()).hexdigest()
+    digest = hashlib.sha256(f"bare:{run_id}".encode()).hexdigest()
     return (
         f"urn:uuid:{digest[0:8]}-{digest[8:12]}-{digest[12:16]}-"
         f"{digest[16:20]}-{digest[20:32]}"
@@ -93,8 +93,8 @@ def build_sbom(
             # required shape, and the single most useful thing for anyone who
             # has to go and remove the component.
             "properties": [
-                {"name": "sightglass:path", "value": component.path_in_tree},
-                {"name": "sightglass:confidence", "value": component.confidence.value},
+                {"name": "bare:path", "value": component.path_in_tree},
+                {"name": "bare:confidence", "value": component.confidence.value},
             ],
         }
         if component.licence:
@@ -115,7 +115,7 @@ def build_sbom(
                 "components": [
                     {
                         "type": "application",
-                        "name": "Sightglass",
+                        "name": "BARE",
                         "version": tool_version,
                     }
                 ]
@@ -130,17 +130,17 @@ def build_sbom(
                     else []
                 ),
                 "properties": [
-                    {"name": "sightglass:run", "value": run_id},
-                    {"name": "sightglass:size_bytes", "value": str(artifact_size_bytes)},
+                    {"name": "bare:run", "value": run_id},
+                    {"name": "bare:size_bytes", "value": str(artifact_size_bytes)},
                     {
-                        "name": "sightglass:files_examined",
+                        "name": "bare:files_examined",
                         "value": str(inventory.files_examined),
                     },
                     # Stated in the document rather than only in the UI: an SBOM
                     # built from a partial walk must say so, or it will be read
                     # as a complete inventory.
                     {
-                        "name": "sightglass:inventory_complete",
+                        "name": "bare:inventory_complete",
                         "value": "false" if inventory.truncated else "true",
                     },
                 ],

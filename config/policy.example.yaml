@@ -1,10 +1,10 @@
-# Sightglass release policy
+# BARE release policy
 #
-# Copy to `.sightglass/policy.yaml` in the repository that produces the
+# Copy to `.bare/policy.yaml` in the repository that produces the
 # artifact, and commit it. The team that owns the binary owns the definition of
 # "shippable", and changing this file should require a review.
 #
-# Validate with:  sightglass policy validate .sightglass/policy.yaml
+# Validate with:  bare policy validate .bare/policy.yaml
 
 version: 1
 name: default
@@ -60,7 +60,7 @@ on_degraded: fail
 trust_llm_dismissals: false
 
 waivers:
-  # Waivers live in `.sightglass/waivers.yaml` next to this file.
+  # Waivers live in `.bare/waivers.yaml` next to this file.
   max_ttl_days: 90
   require_owner: true
   require_reason: true

@@ -250,7 +250,7 @@ class PdfWriter:
         kids = " ".join(f"{pid} 0 R" for pid in page_ids)
         add(f"<< /Type /Pages /Count {len(page_ids)} /Kids [{kids}] >>".encode("latin-1"))
         info_id = add(
-            f"<< /Title ({_escape(_latin1(title))}) /Producer (Sightglass) >>".encode("latin-1")
+            f"<< /Title ({_escape(_latin1(title))}) /Producer (BARE) >>".encode("latin-1")
         )
         catalog_id = add(f"<< /Type /Catalog /Pages {pages_id} 0 R >>".encode("latin-1"))
 
@@ -319,11 +319,11 @@ def render_report(data: ReportData) -> bytes:
     _findings(pdf, data)
     _methodology(pdf, data)
 
-    return pdf.build(f"Sightglass release record - {data.artifact_name}")
+    return pdf.build(f"BARE release record - {data.artifact_name}")
 
 
 def _cover(pdf: PdfWriter, data: ReportData) -> None:
-    pdf.text("SIGHTGLASS", size=8, bold=True, colour=INK_MUTED, leading=6)
+    pdf.text("BARE", size=8, bold=True, colour=INK_MUTED, leading=6)
     pdf.text("Release record", size=25, bold=True, leading=30)
 
     pdf.text(_clip(data.artifact_name, 13, CONTENT_WIDTH), size=13, leading=16)

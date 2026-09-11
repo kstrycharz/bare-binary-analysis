@@ -17,7 +17,7 @@ from core.orchestrator.celery_app import QUEUE_LLM, QUEUE_STATIC, celery_app
 log = structlog.get_logger(__name__)
 
 
-@celery_app.task(name="sightglass.scan_run", queue=QUEUE_STATIC, bind=True, max_retries=0)
+@celery_app.task(name="bare.scan_run", queue=QUEUE_STATIC, bind=True, max_retries=0)
 def scan_run(self: Any, run_id: str) -> dict[str, Any]:
     """Run the full scan pipeline for one run.
 
@@ -48,7 +48,7 @@ def scan_run(self: Any, run_id: str) -> dict[str, Any]:
     }
 
 
-@celery_app.task(name="sightglass.triage_run", queue=QUEUE_LLM, max_retries=0)
+@celery_app.task(name="bare.triage_run", queue=QUEUE_LLM, max_retries=0)
 def triage_run_task(run_id: str) -> dict[str, Any]:
     """Run LLM triage over a completed run's findings.
 
@@ -117,7 +117,7 @@ def triage_run_task(run_id: str) -> dict[str, Any]:
     }
 
 
-@celery_app.task(name="sightglass.discover_rules", queue=QUEUE_LLM, max_retries=0)
+@celery_app.task(name="bare.discover_rules", queue=QUEUE_LLM, max_retries=0)
 def discover_rules_task(run_id: str) -> dict[str, Any]:
     """Ask the model to propose rules for what the pack missed on this run.
 
@@ -207,7 +207,7 @@ def _llm_provider(role: str, run_id: str) -> tuple[Any, dict[str, Any] | None]:
     return provider, None
 
 
-@celery_app.task(name="sightglass.explain_finding", queue=QUEUE_LLM, max_retries=0)
+@celery_app.task(name="bare.explain_finding", queue=QUEUE_LLM, max_retries=0)
 def explain_finding_task(run_id: str, finding_id: str) -> dict[str, Any]:
     """Explain one finding in depth, on request.
 
@@ -261,7 +261,7 @@ def explain_finding_task(run_id: str, finding_id: str) -> dict[str, Any]:
         }
 
 
-@celery_app.task(name="sightglass.summarize_run", queue=QUEUE_LLM, max_retries=0)
+@celery_app.task(name="bare.summarize_run", queue=QUEUE_LLM, max_retries=0)
 def summarize_run_task(run_id: str) -> dict[str, Any]:
     """One reviewer-facing paragraph over the whole run."""
     from core.llm import summarize_run
@@ -305,7 +305,7 @@ def summarize_run_task(run_id: str) -> dict[str, Any]:
         }
 
 
-@celery_app.task(name="sightglass.investigate_finding", queue=QUEUE_LLM, max_retries=0)
+@celery_app.task(name="bare.investigate_finding", queue=QUEUE_LLM, max_retries=0)
 def investigate_finding_task(run_id: str, finding_id: str) -> dict[str, Any]:
     """Let the model investigate one finding with tools.
 

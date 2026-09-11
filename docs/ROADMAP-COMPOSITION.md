@@ -1,7 +1,7 @@
 # Reporting and binary composition analysis
 
 Two related gaps, planned together because the second is what makes the first
-worth reading: Sightglass can say *what secrets an artifact leaks* but not
+worth reading: BARE can say *what secrets an artifact leaks* but not
 *what the artifact is made of*. A release record that answers only the first
 question is half a document.
 
@@ -38,7 +38,7 @@ NVIDIA-AI-Workbench-Setup.exe   (NSIS, 213 MB)
 **And one gap that is not a defect but an absence.** Inside that `app.asar`,
 in the truncated slice alone:
 
-| Evidence present | Count | What Sightglass reports today |
+| Evidence present | Count | What BARE reports today |
 | --- | --- | --- |
 | `package.json` manifests | 1 570 | nothing |
 | License files | 66 | nothing |
@@ -50,7 +50,7 @@ Duck Binary Analysis capability, and it is missing rather than broken.
 
 ---
 
-## 2. Where Sightglass already is
+## 2. Where BARE already is
 
 The foundations are unusually good for this, and that is the argument for
 building on them rather than bolting on a scanner:
@@ -213,7 +213,7 @@ depth on an inventory that already exists.
 
 ## 7. What this is not
 
-* **Not a replacement for source-code SCA.** Sightglass looks at what shipped.
+* **Not a replacement for source-code SCA.** BARE looks at what shipped.
   A dependency scanned in CI and a dependency present in the binary are
   different facts, and the gap between them is often the interesting finding.
 * **Not a licence-compliance legal opinion.** It reports what it identified and

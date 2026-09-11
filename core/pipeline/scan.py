@@ -26,7 +26,7 @@ import structlog
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from core.config import SIGHTGLASS_VERSION, get_settings
+from core.config import BARE_VERSION, get_settings
 from core.models import Artifact, Evidence, Run, RunManifest, RunStage, Suppression
 from core.models.base import new_uuid
 from core.models.enums import RunStatus, StageStatus
@@ -235,7 +235,7 @@ def _execute(run: Run, session: Session, run_dir: Path) -> ScanOutcome:
     session.add(
         RunManifest(
             run_id=run.id,
-            sightglass_version=SIGHTGLASS_VERSION,
+            bare_version=BARE_VERSION,
             artifact_sha256=root.sha256,
             rule_pack_version=pack.version,
             rule_pack_hash=pack.hash,

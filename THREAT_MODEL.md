@@ -51,7 +51,7 @@ container's configuration is not evidence that the configuration took effect.
 
 ## What it does not defend against — and why
 
-**Anti-analysis and hostile artifacts.** Sightglass does not implement
+**Anti-analysis and hostile artifacts.** BARE does not implement
 anti-anti-debug, commercial protector unpacking, or evasion detection. An
 artifact deliberately built to defeat analysis will defeat this analysis. That
 is a deliberate scope decision, not an oversight: the tool exists to find

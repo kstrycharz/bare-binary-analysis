@@ -10,7 +10,7 @@
  *
  * 1. **A Route Handler, not a `next.config` rewrite.** `rewrites()` is resolved
  *    at BUILD time and baked into the routes manifest, so an image built
- *    without SIGHTGLASS_API_URL set proxies to `localhost:8000` forever — which
+ *    without BARE_API_URL set proxies to `localhost:8000` forever — which
  *    inside the web container is the web container. Server-rendered pages keep
  *    working because they read the env at runtime, so the symptom is baffling:
  *    every page loads and only uploads, triage, and status changes fail.
@@ -31,7 +31,7 @@ import { getApiToken } from "@/lib/runtime-token";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const API_URL = process.env.SIGHTGLASS_API_URL ?? "http://localhost:8000";
+const API_URL = process.env.BARE_API_URL ?? "http://localhost:8000";
 
 // Hop-by-hop headers, plus ones the upstream must compute for itself. `host`
 // would break virtual-host routing; `content-length` would contradict a
@@ -46,7 +46,7 @@ const STRIPPED_REQUEST_HEADERS = new Set([
   // authenticates as itself; letting a page script smuggle its own credential
   // through this proxy would make the server-side token pointless.
   "authorization",
-  "x-sightglass-token",
+  "x-bare-token",
 ]);
 
 const STRIPPED_RESPONSE_HEADERS = new Set([
@@ -105,7 +105,7 @@ function proxy(request: NextRequest, path: string[]): Promise<Response> {
     upstream.on("error", (error: Error) => {
       resolve(
         Response.json(
-          { detail: `Could not reach the Sightglass API at ${API_URL}: ${error.message}` },
+          { detail: `Could not reach the BARE API at ${API_URL}: ${error.message}` },
           { status: 502 },
         ),
       );

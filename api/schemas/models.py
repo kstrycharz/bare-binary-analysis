@@ -79,7 +79,7 @@ class ManifestOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    sightglass_version: str
+    bare_version: str
     artifact_sha256: str
     rule_pack_version: str
     rule_pack_hash: str

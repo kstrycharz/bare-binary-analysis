@@ -1,4 +1,4 @@
-"""A minimal Sightglass API client for CI runners.
+"""A minimal BARE API client for CI runners.
 
 Standard library only, on purpose. This is the one component that gets
 installed on every build agent in a company, and "add a scanner to the
@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO
 
-USER_AGENT = "sightglass-cli"
+USER_AGENT = "bare-cli"
 DEFAULT_TIMEOUT_S = 60.0
 
 
@@ -115,8 +115,8 @@ class RunHandle:
     status: str
 
 
-class SightglassClient:
-    """Talks to one Sightglass deployment."""
+class BareClient:
+    """Talks to one BARE deployment."""
 
     def __init__(
         self,

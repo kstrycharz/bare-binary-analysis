@@ -1,1 +1,1 @@
-"""The `sightglass` command-line interface."""
+"""The `bare` command-line interface."""

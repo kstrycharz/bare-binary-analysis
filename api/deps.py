@@ -98,11 +98,11 @@ def get_caller(
     request: Request,
     session: Annotated[Session, Depends(get_session)],
     authorization: Annotated[str | None, Header()] = None,
-    x_sightglass_token: Annotated[str | None, Header()] = None,
+    x_bare_token: Annotated[str | None, Header()] = None,
 ) -> Caller:
     """Resolve and validate the caller's credential.
 
-    ``X-Sightglass-Token`` is accepted alongside ``Authorization`` because some
+    ``X-Bare-Token`` is accepted alongside ``Authorization`` because some
     CI systems and proxies rewrite or strip the standard header, and a gate
     that cannot be called is a gate that gets removed from the pipeline.
     """
@@ -111,7 +111,7 @@ def get_caller(
         return ANONYMOUS
 
     presented = parse_bearer(authorization) or (
-        x_sightglass_token.strip() if x_sightglass_token else None
+        x_bare_token.strip() if x_bare_token else None
     )
     if not presented:
         _reject(session, request, "no credential presented", None)

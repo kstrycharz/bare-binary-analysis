@@ -111,7 +111,7 @@ class TestTheGateAndTheRunAgree:
 
 class TestRunStatus:
     def test_degraded_is_terminal(self) -> None:
-        """Otherwise `sightglass scan` polls a finished run for ever."""
+        """Otherwise `bare scan` polls a finished run for ever."""
         assert RunStatus.DEGRADED.is_terminal
 
     def test_degraded_still_has_results_worth_reading(self) -> None:

@@ -1,4 +1,4 @@
-# Sightglass task runner.
+# BARE task runner.
 #
 # Windows users without `make`: run `./make.ps1 <target>`, which forwards to the
 # same commands. Keep the two in sync — every target added here needs an entry
@@ -10,7 +10,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 COMPOSE_DEV := $(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml
 PY := uv run
-RUN_ROOT ?= /var/lib/sightglass/runs
+RUN_ROOT ?= /var/lib/bare/runs
 
 .PHONY: help
 help: ## Show this help
@@ -58,10 +58,10 @@ shell: ## Open a shell in the API container
 #
 # The tag these are built with, and the tag the orchestrator runs, come from the
 # same variable, so `make images` and a scan cannot disagree about which image
-# they mean. `?=` keeps the environment authoritative: SIGHTGLASS_ANALYZER_TAG
+# they mean. `?=` keeps the environment authoritative: BARE_ANALYZER_TAG
 # set in the shell (or in .env, exported) wins, and an unset variable builds
 # `:dev` exactly as before.
-SIGHTGLASS_ANALYZER_TAG ?= dev
+BARE_ANALYZER_TAG ?= dev
 
 # `docker compose up` already builds all three; these targets are for building
 # one in isolation. They delegate so the build context and dockerfile for each
@@ -69,14 +69,14 @@ SIGHTGLASS_ANALYZER_TAG ?= dev
 #
 # Normalised to match core.sandbox.images.analyzer_tag(), which strips and falls
 # back to `dev`. Without this an exported-but-empty variable built
-# `sightglass/hello:` — a reference the daemon rejects with an error naming
+# `bare/hello:` — a reference the daemon rejects with an error naming
 # nothing useful — while a scan went looking for `:dev`. Whitespace-only is the
 # same class of broken deployment script and resolves the same way.
-override SIGHTGLASS_ANALYZER_TAG := $(or $(strip $(SIGHTGLASS_ANALYZER_TAG)),dev)
+override BARE_ANALYZER_TAG := $(or $(strip $(BARE_ANALYZER_TAG)),dev)
 
 # Passed on the command line rather than exported: make does not export `?=`
 # variables to recipes, and Compose reads this one from the environment.
-BUILD_ANALYZER := SIGHTGLASS_ANALYZER_TAG=$(SIGHTGLASS_ANALYZER_TAG) $(COMPOSE) build
+BUILD_ANALYZER := BARE_ANALYZER_TAG=$(BARE_ANALYZER_TAG) $(COMPOSE) build
 
 .PHONY: images
 images: image-hello image-static image-unpack ## Build every analyzer image
@@ -139,8 +139,8 @@ check: lint typecheck test ## Everything CI runs on a pull request
 
 .PHONY: sandbox-check
 sandbox-check: image-hello run-root ## M0 acceptance: run the probe through the real sandbox
-	SIGHTGLASS_RUN_ROOT=$(RUN_ROOT) $(PY) sightglass sandbox health
-	SIGHTGLASS_RUN_ROOT=$(RUN_ROOT) $(PY) sightglass sandbox hello
+	BARE_RUN_ROOT=$(RUN_ROOT) $(PY) bare sandbox health
+	BARE_RUN_ROOT=$(RUN_ROOT) $(PY) bare sandbox hello
 
 # --- placeholders (raise until implemented; see CLAUDE.md) -------------------
 

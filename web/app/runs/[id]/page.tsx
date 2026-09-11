@@ -202,7 +202,7 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
               >
                 <dl className="space-y-1.5 px-4 py-3 text-xs">
                   <ManifestRow label="fingerprint" value={run.manifest.fingerprint.slice(0, 20)} />
-                  <ManifestRow label="sightglass" value={run.manifest.sightglass_version} />
+                  <ManifestRow label="bare" value={run.manifest.bare_version} />
                   <ManifestRow
                     label="rule pack"
                     value={`${run.manifest.rule_pack_version} · ${run.manifest.rule_pack_hash.slice(0, 10)}`}
@@ -235,19 +235,19 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
             <div className="flex flex-wrap gap-2 px-4 py-3">
               <ExportLink
                 href={`/api/runs/${run.id}/sbom`}
-                filename={`sightglass-${run.id}-sbom.cdx.json`}
+                filename={`bare-${run.id}-sbom.cdx.json`}
                 label="CycloneDX SBOM"
                 detail="What this artifact is made of"
               />
               <ExportLink
                 href={`/api/runs/${run.id}/sarif`}
-                filename={`sightglass-${run.id}.sarif`}
+                filename={`bare-${run.id}.sarif`}
                 label="SARIF"
                 detail="For code scanning"
               />
               <ExportLink
                 href={`/api/runs/${run.id}/report.pdf`}
-                filename={`sightglass-${run.id}.pdf`}
+                filename={`bare-${run.id}.pdf`}
                 label="PDF record"
                 detail="The release record"
               />

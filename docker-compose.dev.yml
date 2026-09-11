@@ -6,7 +6,7 @@
 # them. Never use this file in a deployment — it opens ports the reference
 # deployment deliberately keeps internal.
 
-name: sightglass
+name: bare
 
 x-dev-source: &dev-source
   - ./core:/app/core
@@ -22,22 +22,22 @@ x-dev-source: &dev-source
 services:
   postgres:
     ports:
-      - "${SIGHTGLASS_POSTGRES_PORT:-5432}:5432"
+      - "${BARE_POSTGRES_PORT:-5432}:5432"
 
   redis:
     ports:
-      - "${SIGHTGLASS_REDIS_PORT:-6379}:6379"
+      - "${BARE_REDIS_PORT:-6379}:6379"
 
   minio:
     ports:
-      - "${SIGHTGLASS_MINIO_PORT:-9000}:9000"
-      - "${SIGHTGLASS_MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${BARE_MINIO_PORT:-9000}:9000"
+      - "${BARE_MINIO_CONSOLE_PORT:-9001}:9001"
 
   api:
     environment:
-      SIGHTGLASS_ENVIRONMENT: development
-      SIGHTGLASS_LOG_JSON: "false"
-      SIGHTGLASS_LOG_LEVEL: DEBUG
+      BARE_ENVIRONMENT: development
+      BARE_LOG_JSON: "false"
+      BARE_LOG_LEVEL: DEBUG
     command:
       - uvicorn
       - api.main:app
@@ -54,12 +54,12 @@ services:
 
   worker:
     environment:
-      SIGHTGLASS_ENVIRONMENT: development
-      SIGHTGLASS_LOG_JSON: "false"
-      SIGHTGLASS_LOG_LEVEL: DEBUG
+      BARE_ENVIRONMENT: development
+      BARE_LOG_JSON: "false"
+      BARE_LOG_LEVEL: DEBUG
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${SIGHTGLASS_RUN_ROOT_HOST:-/var/lib/sightglass/runs}:/var/lib/sightglass/runs
+      - ${BARE_RUN_ROOT_HOST:-/var/lib/bare/runs}:/var/lib/bare/runs
       - ./core:/app/core
       - ./api:/app/api
       - ./cli:/app/cli
@@ -72,16 +72,16 @@ services:
 
   worker-heavy:
     environment:
-      SIGHTGLASS_LOG_JSON: "false"
+      BARE_LOG_JSON: "false"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${SIGHTGLASS_RUN_ROOT_HOST:-/var/lib/sightglass/runs}:/var/lib/sightglass/runs
+      - ${BARE_RUN_ROOT_HOST:-/var/lib/bare/runs}:/var/lib/bare/runs
       - ./core:/app/core
       - ./sandbox:/app/sandbox
 
   beat:
     environment:
-      SIGHTGLASS_LOG_JSON: "false"
+      BARE_LOG_JSON: "false"
     volumes: *dev-source
 
   web:

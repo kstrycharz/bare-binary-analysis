@@ -140,7 +140,7 @@ rules:
     remediation: |
       If the address is a real internal endpoint, move it to runtime
       configuration. If it is a default for a device's own AP or gateway,
-      annotate it and suppress this finding via `.sightglass-ignore.yaml` so it
+      annotate it and suppress this finding via `.bare-ignore.yaml` so it
       stops appearing every release.
     patterns:
       # Octets are validated rather than written as \d{1,3}. The loose form
