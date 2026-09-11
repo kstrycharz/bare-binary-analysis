@@ -50,7 +50,14 @@ export function LlmControls({ settings }: { settings: LlmSettings }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
-  const healthy = settings.providers.filter((p) => p.available_models.length > 0);
+  // Reachable, not enumerable. Only the Ollama adapter can list what an
+  // endpoint has; a health-probed LiteLLM provider reports an empty
+  // available_models because there is no uniform model listing across its
+  // vendors — not because it is unreachable. Filtering on the list used to
+  // hide every provider the wizard had just connected and verified, which
+  // read as "No reachable provider" until something happened to make the
+  // probe report models again.
+  const usable = settings.providers.filter((p) => p.healthy);
 
   async function send(body: Record<string, unknown>, note: string) {
     setError(null);
@@ -113,17 +120,22 @@ export function LlmControls({ settings }: { settings: LlmSettings }) {
         </Button>
       </div>
 
-      {healthy.length === 0 ? (
-        <div className="rounded-lg border border-border bg-surface px-4 py-5">
-          <p className="text-[13px] font-medium">No reachable provider</p>
-          <p className="mt-1.5 max-w-xl text-[12px] leading-relaxed text-content-subtle">
-            Models are chosen from what an endpoint actually reports, so there is
-            nothing to pick from until one answers. Check the endpoints in{" "}
-            <span className="font-mono">config/llm.yaml</span> and reload.
-          </p>
-        </div>
+      {usable.length === 0 ? (
+        settings.enabled ? (
+          <div className="rounded-lg border border-border bg-surface px-4 py-5">
+            <p className="text-[13px] font-medium">No reachable provider</p>
+            <p className="mt-1.5 max-w-xl text-[12px] leading-relaxed text-content-subtle">
+              {settings.providers.length === 0
+                ? "No provider is configured yet. Use the setup wizard on the " +
+                  "first run, or add one on this page once the stack can reach it."
+                : "Every configured provider failed its live probe. The findings " +
+                  "and verdicts below them are deterministic and unchanged; see " +
+                  "each provider's detail line in the Providers panel."}
+            </p>
+          </div>
+        ) : null
       ) : (
-        healthy.map((provider) => (
+        usable.map((provider) => (
           <ProviderCard
             key={provider.name}
             provider={provider}
@@ -190,7 +202,13 @@ function ProviderCard({
         <div>
           <p className="eyebrow">Model</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            {provider.available_models.map((model) => {
+            {/* Most LiteLLM vendors expose no uniform model listing, so the
+                probe reports none. Show the configured model as the one chip
+                rather than an empty row — the card still works for roles. */}
+            {(provider.available_models.length > 0
+              ? provider.available_models
+              : [provider.model]
+            ).map((model) => {
               const active = model === provider.model;
               return (
                 <button

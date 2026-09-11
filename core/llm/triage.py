@@ -160,11 +160,14 @@ def triage_finding(
 def _parse(completion: Completion) -> tuple[LlmVerdict, str]:
     payload = completion.as_json()
     if not payload:
-        if completion.raw.get("thinking") and not completion.text:
+        if completion.raw.get("thinking"):
+            # Either an empty answer or one truncated inside the JSON — both
+            # are the reasoner spending a budget sized for a non-reasoning
+            # model. Say which knob to turn rather than blaming the parser.
             return (
                 LlmVerdict.ERROR,
                 "the model exhausted its token budget on reasoning without "
-                "producing an answer; use a non-reasoning model for triage",
+                "producing a complete answer; use a non-reasoning model for triage",
             )
         return LlmVerdict.ERROR, "model did not return parseable JSON"
 
