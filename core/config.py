@@ -44,7 +44,7 @@ class Settings(BaseSettings):
 
     s3_endpoint_url: str = "http://minio:9000"
     s3_access_key: str = "bare"
-    s3_secret_key: str = "bare"
+    s3_secret_key: str = "bare-secret-key"
     s3_bucket_artifacts: str = "bare-artifacts"
     s3_region: str = "us-east-1"
 
