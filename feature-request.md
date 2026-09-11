@@ -65,7 +65,13 @@ no network and no Docker socket — that are not up for negotiation in a PR.
 
 ## Open bounties
 
-### `analyzer-logs` — keep the logs the scanning containers produce · **S**
+### ~~`analyzer-logs`~~ — keep the logs the scanning containers produce · **S** · **DONE**
+
+Delivered as `GET /api/runs/{id}/stages/{stage_id}/logs` + a disclosure column on the
+stages table; retention in object storage with write-time redaction (ADR-0032).
+
+<details>
+<summary>Original bounty</summary>
 
 Today the container's output is collected and then thrown away.
 `DockerDriver._collect_logs()` reads stdout and stderr, caps them at
@@ -93,6 +99,8 @@ panel next to the stage row would do it.
 **Done when:** a deliberately failing analyzer run shows its output in the
 dashboard, the redaction policy demonstrably applies, and a very chatty analyzer
 cannot grow a row without bound.
+
+</details>
 
 ---
 
@@ -211,7 +219,12 @@ against the three small Python ones that already agree with each other.
 
 ---
 
-### `runs-live` — the Runs tab does not show runs that are running · **S**
+### ~~`runs-live`~~ — the Runs tab does not show runs that are running · **S** · **DONE**
+
+Delivered as `GET /api/runs/events` + the `RunsLive` wrapper (ADR-0031).
+
+<details>
+<summary>Original bounty</summary>
 
 Start a scan, click **Runs**, and the run you just started is often not there.
 
@@ -243,6 +256,8 @@ run-list events, or poll at a sane interval and only while a run is active.
 
 **Done when:** starting a scan in one tab makes it appear in the Runs tab of
 another without a manual reload, and a completing run updates in place.
+
+</details>
 
 ---
 

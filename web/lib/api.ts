@@ -51,6 +51,7 @@ export interface RunSummary {
 }
 
 export interface Stage {
+  id: string;
   analyzer: string;
   status: string;
   duration_s: number | null;
@@ -58,6 +59,10 @@ export interface Stage {
   evidence_count: number;
   error: string | null;
   image_digest: string | null;
+  /** Bytes of retained analyzer stdout/stderr (object storage; the row only
+   *  points at them). Null for stages recorded before log retention. */
+  log_bytes: number | null;
+  log_truncated: boolean;
 }
 
 export interface Manifest {
