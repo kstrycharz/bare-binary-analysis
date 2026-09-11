@@ -47,7 +47,10 @@ class TestNothingRunsAgainstAnUnmigratedDatabase:
             for path in Path(directory).rglob("*.py")
         ]
         callers = sorted(
-            str(path)
+            # as_posix(), not str(): on Windows str(Path) yields "api\main.py"
+            # and the comparison below is against a forward-slash literal, so
+            # this assertion could only ever pass on Linux (ADR-0006).
+            path.as_posix()
             for path in sources
             if any(
                 "upgrade_schema()" in line and not line.lstrip().startswith("def ")
