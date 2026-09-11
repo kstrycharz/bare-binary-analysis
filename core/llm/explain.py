@@ -121,9 +121,7 @@ def explain_finding(
         Message("system", EXPLAIN_SYSTEM_PROMPT),
         Message(
             "user",
-            build_explain_prompt(
-                finding, path_in_tree=path_in_tree, location_count=location_count
-            ),
+            build_explain_prompt(finding, path_in_tree=path_in_tree, location_count=location_count),
         ),
     ]
 
@@ -173,9 +171,9 @@ def build_summary_prompt(
     for finding in findings:
         counts[finding.severity] = counts.get(finding.severity, 0) + 1
 
-    tally = ", ".join(
-        f"{counts[s.value]} {s.value}" for s in Severity if counts.get(s.value)
-    ) or "none"
+    tally = (
+        ", ".join(f"{counts[s.value]} {s.value}" for s in Severity if counts.get(s.value)) or "none"
+    )
 
     lines = [
         f"Artifact: {artifact_name}",

@@ -264,9 +264,7 @@ def test_rendering_never_emits_a_raw_secret() -> None:
 # TimeoutError, which is not a URLError and so matched no handler at all.
 
 
-def _client_raising(
-    monkeypatch: pytest.MonkeyPatch, exc: BaseException
-) -> BareClient:
+def _client_raising(monkeypatch: pytest.MonkeyPatch, exc: BaseException) -> BareClient:
     """Fail at the socket, where these errors actually originate."""
 
     def _boom(*args: object, **kwargs: object) -> None:

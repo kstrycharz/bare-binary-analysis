@@ -56,9 +56,7 @@ class TestWhichStagesCount:
         "status",
         [StageStatus.FAILED, StageStatus.TIMEOUT, StageStatus.OOM, StageStatus.TRUNCATED],
     )
-    def test_every_incomplete_outcome_degrades(
-        self, session: Session, status: StageStatus
-    ) -> None:
+    def test_every_incomplete_outcome_degrades(self, session: Session, status: StageStatus) -> None:
         """TRUNCATED belongs here as much as FAILED: a partially unpacked
         artifact was partially examined, whatever the exit code said."""
         run_id = _run_with(session, ("static", status))
@@ -104,7 +102,7 @@ class TestTheGateAndTheRunAgree:
         assert gate_view(session, run_id) == describe_degraded(degraded_stages(session, run_id))
 
     def test_the_gate_reports_the_failed_analyzer_by_name(self, session: Session) -> None:
-        """"Scan incomplete" is not actionable; "static (failed)" is."""
+        """ "Scan incomplete" is not actionable; "static (failed)" is."""
         run_id = _run_with(session, ("static", StageStatus.FAILED))
         assert gate_view(session, run_id) == ["static (failed)"]
 

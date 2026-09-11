@@ -122,9 +122,7 @@ class TestEndToEnd:
         self, driver: DockerDriver, run_dirs: tuple[Path, Path, Path], docker_client: Any
     ) -> None:
         result = driver.run(make_spec(run_dirs))
-        remaining = docker_client.containers.list(
-            all=True, filters={"label": "bare.run=run-1"}
-        )
+        remaining = docker_client.containers.list(all=True, filters={"label": "bare.run=run-1"})
         assert [c.id for c in remaining] == []
         assert result.container_id is not None
 

@@ -382,9 +382,7 @@ def test_gate_blocked_exits_one(server: str) -> None:
 
 def test_gate_sends_a_policy_and_a_baseline_override(server: str, tmp_path: Path) -> None:
     policy = tmp_path / "policy.yaml"
-    policy.write_text(
-        "version: 1\nname: release\nbaseline:\n  mode: all\n", encoding="utf-8"
-    )
+    policy.write_text("version: 1\nname: release\nbaseline:\n  mode: all\n", encoding="utf-8")
     result = _invoke_gate(server, "--policy", str(policy), "--baseline-run", "run-0")
     assert result.exit_code == 0
 
