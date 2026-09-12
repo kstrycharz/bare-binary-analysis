@@ -159,9 +159,7 @@ class BareClient:
         request = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
             # The base URL is operator-supplied configuration, not attacker input.
-            with urllib.request.urlopen(
-                request, timeout=timeout_s or self._timeout_s
-            ) as response:
+            with urllib.request.urlopen(request, timeout=timeout_s or self._timeout_s) as response:
                 raw = response.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")
@@ -276,9 +274,7 @@ class BareClient:
             with urllib.request.urlopen(request, timeout=self._timeout_s) as response:
                 return bytes(response.read())
         except urllib.error.HTTPError as exc:
-            raise ApiError(
-                f"GET report.pdf failed: HTTP {exc.code}", status=exc.code
-            ) from None
+            raise ApiError(f"GET report.pdf failed: HTTP {exc.code}", status=exc.code) from None
         except urllib.error.URLError as exc:
             raise ApiError(f"cannot reach {self.base_url}: {exc.reason}") from None
         except TimeoutError:

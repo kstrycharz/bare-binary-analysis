@@ -164,9 +164,7 @@ def _previous_finding_ids(session: Session, run_id: str) -> set[str]:
 MAX_PLAINTEXT_VALUES = 500
 
 
-def _plaintexts(
-    session: Session, finding: Finding, locations: list[FindingLocation]
-) -> list[str]:
+def _plaintexts(session: Session, finding: Finding, locations: list[FindingLocation]) -> list[str]:
     """The real values behind this finding, when the run retained them.
 
     Matched through the finding's *locations*, not its ``value_hash``. A

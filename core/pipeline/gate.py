@@ -92,9 +92,7 @@ def resolve_baseline(
         )
         return BaselineRef()
 
-    ids = frozenset(
-        session.scalars(select(Finding.id).where(Finding.run_id == previous.id)).all()
-    )
+    ids = frozenset(session.scalars(select(Finding.id).where(Finding.run_id == previous.id)).all())
     source = "explicit_run" if baseline_run_id else "previous_run"
     return BaselineRef(run_id=previous.id, finding_ids=ids, source=source)
 
@@ -103,9 +101,7 @@ def collect_gate_findings(
     session: Session, run_id: str, baseline: BaselineRef
 ) -> list[GateFinding]:
     """Project this run's findings into the gate's narrow view."""
-    findings = list(
-        session.scalars(select(Finding).where(Finding.run_id == run_id)).all()
-    )
+    findings = list(session.scalars(select(Finding).where(Finding.run_id == run_id)).all())
     if not findings:
         return []
 
@@ -147,9 +143,7 @@ def _artifact_paths(session: Session, run_id: str, finding_ids: list[str]) -> di
             FindingLocation.run_id == run_id,
             FindingLocation.finding_id.in_(finding_ids),
         )
-        .order_by(
-            FindingLocation.finding_id, FindingLocation.path_in_tree, FindingLocation.offset
-        )
+        .order_by(FindingLocation.finding_id, FindingLocation.path_in_tree, FindingLocation.offset)
     ).all()
 
     paths: dict[str, str] = {}

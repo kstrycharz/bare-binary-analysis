@@ -89,27 +89,49 @@ def _seed(session: Session) -> None:
         )
     session.add(
         Artifact(
-            id="a1", run_id="r1", name="app.exe", path_in_tree="app.exe",
-            depth=0, sha256="0" * 64, size_bytes=2048, kind=ArtifactKind.PE,
+            id="a1",
+            run_id="r1",
+            name="app.exe",
+            path_in_tree="app.exe",
+            depth=0,
+            sha256="0" * 64,
+            size_bytes=2048,
+            kind=ArtifactKind.PE,
         )
     )
     # Belongs to a different run. Nothing in r1 may reach it.
     session.add(
         Artifact(
-            id="a2", run_id="r2", name="other.exe", path_in_tree="other.exe",
-            depth=0, sha256="1" * 64, size_bytes=2048, kind=ArtifactKind.PE,
+            id="a2",
+            run_id="r2",
+            name="other.exe",
+            path_in_tree="other.exe",
+            depth=0,
+            sha256="1" * 64,
+            size_bytes=2048,
+            kind=ArtifactKind.PE,
         )
     )
     session.add(
         Evidence(
-            run_id="r1", artifact_id="a1", analyzer="static", rule_id="aws-access-key-id",
-            value_hash="a" * 64, value_masked="AKIA••••••••••••WXYZ", offset=100,
+            run_id="r1",
+            artifact_id="a1",
+            analyzer="static",
+            rule_id="aws-access-key-id",
+            value_hash="a" * 64,
+            value_masked="AKIA••••••••••••WXYZ",
+            offset=100,
         )
     )
     session.add(
         Evidence(
-            run_id="r2", artifact_id="a2", analyzer="static", rule_id="other-rule",
-            value_hash="b" * 64, value_masked="OTHER-RUN-SECRET-VALUE", offset=200,
+            run_id="r2",
+            artifact_id="a2",
+            analyzer="static",
+            rule_id="other-rule",
+            value_hash="b" * 64,
+            value_masked="OTHER-RUN-SECRET-VALUE",
+            offset=200,
         )
     )
     session.flush()
@@ -118,10 +140,18 @@ def _seed(session: Session) -> None:
 @pytest.fixture
 def finding() -> Finding:
     return Finding(
-        id="f1", run_id="r1", rule_id="aws-access-key-id", category="cloud-credentials",
-        title="AWS access key ID", severity=Severity.CRITICAL.value, confidence=0.99,
-        value_masked="AKIA••••••••••••WXYZ", value_hash="a" * 64, entropy=3.9,
-        status=FindingStatus.OPEN, detected_by="rule",
+        id="f1",
+        run_id="r1",
+        rule_id="aws-access-key-id",
+        category="cloud-credentials",
+        title="AWS access key ID",
+        severity=Severity.CRITICAL.value,
+        confidence=0.99,
+        value_masked="AKIA••••••••••••WXYZ",
+        value_hash="a" * 64,
+        entropy=3.9,
+        status=FindingStatus.OPEN,
+        detected_by="rule",
     )
 
 
@@ -282,12 +312,14 @@ class TestTheLoopTerminates:
 class TestItCannotAlterTheFinding:
     """§2.5, enforced structurally: this module writes advisory columns only."""
 
-    def test_applying_a_result_touches_nothing_deterministic(
-        self, finding: Finding
-    ) -> None:
+    def test_applying_a_result_touches_nothing_deterministic(self, finding: Finding) -> None:
         before = (
-            finding.severity, finding.status, finding.value_hash,
-            finding.confidence, finding.rule_id, finding.value_masked,
+            finding.severity,
+            finding.status,
+            finding.value_hash,
+            finding.confidence,
+            finding.rule_id,
+            finding.value_masked,
         )
         from core.llm.investigate import Investigation
 
@@ -295,8 +327,12 @@ class TestItCannotAlterTheFinding:
         apply_investigation(finding, result, "scripted:1b")
 
         after = (
-            finding.severity, finding.status, finding.value_hash,
-            finding.confidence, finding.rule_id, finding.value_masked,
+            finding.severity,
+            finding.status,
+            finding.value_hash,
+            finding.confidence,
+            finding.rule_id,
+            finding.value_masked,
         )
         assert before == after
         assert finding.llm_investigation == "x"
@@ -315,9 +351,7 @@ class TestItCannotAlterTheFinding:
 
 
 class TestTheTranscriptIsKept:
-    def test_every_step_is_recorded_for_audit(
-        self, session: Session, finding: Finding
-    ) -> None:
+    def test_every_step_is_recorded_for_audit(self, session: Session, finding: Finding) -> None:
         """A conclusion with no supporting step is one a reviewer should
         distrust, which is only checkable if the steps survive."""
         provider = ScriptedProvider(
@@ -340,9 +374,7 @@ class TestMalformedTurnsAreVisible:
     to diagnose from — which is how a model writing `"offset": <the offset>`
     stayed invisible through twelve steps and ninety seconds of wall clock."""
 
-    def test_an_unparseable_turn_is_recorded(
-        self, session: Session, finding: Finding
-    ) -> None:
+    def test_an_unparseable_turn_is_recorded(self, session: Session, finding: Finding) -> None:
         provider = ScriptedProvider(
             [
                 '```json\n{"tool": "read_bytes", "arguments": {"offset": <the offset>}}\n```',
@@ -397,9 +429,7 @@ class TestItRecoversFromLoops:
     given. It was not being stupid — it could not see the instructions.
     """
 
-    def test_a_repeated_call_is_not_re_executed(
-        self, session: Session, finding: Finding
-    ) -> None:
+    def test_a_repeated_call_is_not_re_executed(self, session: Session, finding: Finding) -> None:
         calls: list[str] = []
 
         class Counting(ToolBox):
@@ -438,8 +468,7 @@ class TestItRecoversFromLoops:
         """The system prompt must never scroll out of the window — losing it is
         what caused the stall."""
         turns = [
-            json.dumps({"tool": "entropy", "arguments": {"text": f"sample-{i}"}})
-            for i in range(10)
+            json.dumps({"tool": "entropy", "arguments": {"text": f"sample-{i}"}}) for i in range(10)
         ]
         turns.append(json.dumps({"conclusion": "done", "confidence": "low"}))
         provider = ScriptedProvider(turns)
@@ -455,9 +484,7 @@ class TestItRecoversFromLoops:
     def test_dropped_history_is_announced_rather_than_silently_lost(
         self, session: Session, finding: Finding
     ) -> None:
-        turns = [
-            json.dumps({"tool": "entropy", "arguments": {"text": f"s-{i}"}}) for i in range(9)
-        ]
+        turns = [json.dumps({"tool": "entropy", "arguments": {"text": f"s-{i}"}}) for i in range(9)]
         turns.append(json.dumps({"conclusion": "done", "confidence": "low"}))
         provider = ScriptedProvider(turns)
         investigate_finding(

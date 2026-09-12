@@ -75,18 +75,14 @@ class TestPhases:
 
     def test_static_running(self, session: Session) -> None:
         run = _run(session)
-        stages = _stages(
-            session, run, unpack=StageStatus.COMPLETED, static=StageStatus.RUNNING
-        )
+        stages = _stages(session, run, unpack=StageStatus.COMPLETED, static=StageStatus.RUNNING)
         assert _phase(run, stages) == "static"
 
     def test_static_finished_but_run_is_not_is_report(self, session: Session) -> None:
         """Evidence is being correlated into findings and the manifest written.
         Also slow, also previously invisible."""
         run = _run(session)
-        stages = _stages(
-            session, run, unpack=StageStatus.COMPLETED, static=StageStatus.COMPLETED
-        )
+        stages = _stages(session, run, unpack=StageStatus.COMPLETED, static=StageStatus.COMPLETED)
         assert _phase(run, stages) == "report"
 
     @pytest.mark.parametrize(
@@ -104,9 +100,7 @@ class TestPhases:
         """A failed analyzer does not leave the bar stuck mid-scan while the
         pipeline finishes writing what it did get."""
         run = _run(session)
-        stages = _stages(
-            session, run, unpack=StageStatus.COMPLETED, static=StageStatus.FAILED
-        )
+        stages = _stages(session, run, unpack=StageStatus.COMPLETED, static=StageStatus.FAILED)
         assert _phase(run, stages) == "report"
 
     def test_a_stage_row_that_has_not_started_does_not_advance_the_phase(
@@ -118,14 +112,10 @@ class TestPhases:
         from the end while the work had barely begun. Caught by watching a real
         scan, which is the only place the default was ever visible."""
         run = _run(session)
-        stages = _stages(
-            session, run, unpack=StageStatus.COMPLETED, static=StageStatus.PENDING
-        )
+        stages = _stages(session, run, unpack=StageStatus.COMPLETED, static=StageStatus.PENDING)
         assert _phase(run, stages) == "static"
 
-    def test_a_pending_unpack_is_not_mistaken_for_a_finished_one(
-        self, session: Session
-    ) -> None:
+    def test_a_pending_unpack_is_not_mistaken_for_a_finished_one(self, session: Session) -> None:
         run = _run(session)
         assert _phase(run, _stages(session, run, unpack=StageStatus.PENDING)) == "unpack"
 
@@ -145,9 +135,7 @@ class TestPhases:
 class TestExpectedDuration:
     """The only estimate worth showing is one drawn from the same bytes."""
 
-    def _scan(
-        self, session: Session, sha: str, status: RunStatus, seconds: int | None
-    ) -> Run:
+    def _scan(self, session: Session, sha: str, status: RunStatus, seconds: int | None) -> Run:
         run = _run(session, status)
         if seconds is not None:
             run.started_at = NOW

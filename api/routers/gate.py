@@ -146,9 +146,7 @@ def evaluate_gate(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
 
     root = session.scalars(
-        select(Artifact)
-        .where(Artifact.run_id == run_id, Artifact.parent_id.is_(None))
-        .limit(1)
+        select(Artifact).where(Artifact.run_id == run_id, Artifact.parent_id.is_(None)).limit(1)
     ).first()
 
     payload = verdict_to_dict(verdict)
@@ -175,13 +173,9 @@ def get_sarif(
     findings = list(session.scalars(select(Finding).where(Finding.run_id == run_id)).all())
 
     locations = session.execute(
-        select(
-            FindingLocation.finding_id, FindingLocation.path_in_tree, FindingLocation.offset
-        )
+        select(FindingLocation.finding_id, FindingLocation.path_in_tree, FindingLocation.offset)
         .where(FindingLocation.run_id == run_id)
-        .order_by(
-            FindingLocation.finding_id, FindingLocation.path_in_tree, FindingLocation.offset
-        )
+        .order_by(FindingLocation.finding_id, FindingLocation.path_in_tree, FindingLocation.offset)
     ).all()
 
     first_location: dict[str, tuple[str, int | None]] = {}
@@ -284,9 +278,7 @@ def get_pdf_report(
     ).first()
     stages = session.scalars(select(RunStage).where(RunStage.run_id == run_id)).all()
     degraded = tuple(
-        sorted(
-            f"{s.analyzer} ({s.status})" for s in stages if StageStatus(s.status).is_degraded
-        )
+        sorted(f"{s.analyzer} ({s.status})" for s in stages if StageStatus(s.status).is_degraded)
     )
 
     artifact_count = session.scalar(

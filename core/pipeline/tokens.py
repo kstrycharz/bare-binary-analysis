@@ -113,9 +113,7 @@ def revoke_token(session: Session, identifier: str, *, actor: str = "system") ->
         # say "already revoked" instead of "no such token". A name may be
         # reused after revocation, so the active lookup above must come first.
         record = session.scalars(
-            select(ApiToken)
-            .where(ApiToken.name == key)
-            .order_by(ApiToken.created_at.desc())
+            select(ApiToken).where(ApiToken.name == key).order_by(ApiToken.created_at.desc())
         ).first()
     if record is None:
         raise TokenError(f"no active token matches {identifier!r}")

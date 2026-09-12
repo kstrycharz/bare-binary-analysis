@@ -92,9 +92,7 @@ class TestWorkerCount:
         monkeypatch.setenv("BARE_SCAN_WORKERS", "3")
         assert analyzer.scan_worker_count(500) == 3
 
-    def test_invalid_override_is_ignored_not_fatal(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_invalid_override_is_ignored_not_fatal(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BARE_SCAN_WORKERS", "lots")
         monkeypatch.setattr(analyzer, "available_cpus", lambda: 4)
         assert analyzer.scan_worker_count(500) == 4

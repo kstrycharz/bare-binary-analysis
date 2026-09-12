@@ -110,9 +110,7 @@ def get_caller(
     if not settings.auth_required:
         return ANONYMOUS
 
-    presented = parse_bearer(authorization) or (
-        x_bare_token.strip() if x_bare_token else None
-    )
+    presented = parse_bearer(authorization) or (x_bare_token.strip() if x_bare_token else None)
     if not presented:
         _reject(session, request, "no credential presented", None)
 

@@ -151,9 +151,7 @@ def _opening_prompt(finding: Finding, path_in_tree: str, location_count: int) ->
         f"Occurrences: {location_count}",
     ]
     if finding.locations:
-        offsets = [
-            f"0x{loc.offset:x}" for loc in finding.locations[:5] if loc.offset is not None
-        ]
+        offsets = [f"0x{loc.offset:x}" for loc in finding.locations[:5] if loc.offset is not None]
         if offsets:
             lines.append(f"Byte offsets: {', '.join(offsets)}")
     if finding.context_snippet:
@@ -256,9 +254,7 @@ def investigate_finding(
         if "conclusion" in payload:
             result.conclusion = str(payload.get("conclusion", "")).strip()
             confidence = str(payload.get("confidence", "low")).strip().lower()
-            result.confidence = (
-                confidence if confidence in ("high", "medium", "low") else "low"
-            )
+            result.confidence = confidence if confidence in ("high", "medium", "low") else "low"
             return result
 
         tool = str(payload.get("tool", "")).strip()
@@ -300,9 +296,7 @@ def investigate_finding(
         )
 
         history.append(Message("assistant", json.dumps(payload)))
-        history.append(
-            Message("user", _render_result(outcome.ok, outcome.output, outcome.detail))
-        )
+        history.append(Message("user", _render_result(outcome.ok, outcome.output, outcome.detail)))
 
     # Out of steps without a conclusion. Reported as what it is rather than
     # dressed up as a result — the transcript is still worth keeping.

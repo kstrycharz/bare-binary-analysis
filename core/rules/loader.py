@@ -112,8 +112,7 @@ def _build_rule(entry: dict[str, Any], path: Path) -> Rule:
             rejects.append(re.compile(str(expression), DEFAULT_FLAGS))
         except re.error as exc:
             raise RuleLoadError(
-                f"{path.name}: {rule_id}: invalid rejects_matching regex "
-                f"{expression!r}: {exc}"
+                f"{path.name}: {rule_id}: invalid rejects_matching regex " f"{expression!r}: {exc}"
             ) from None
 
     tests = entry.get("tests", {}) or {}

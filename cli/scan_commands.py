@@ -154,21 +154,15 @@ def scan(
     ] = "",
     attestation_ref: Annotated[
         str,
-        typer.Option(
-            envvar="BARE_ATTESTATION_REF", help="Ticket, contract, or pipeline URL."
-        ),
+        typer.Option(envvar="BARE_ATTESTATION_REF", help="Ticket, contract, or pipeline URL."),
     ] = "",
     profile: Annotated[str, typer.Option(help="quick | standard | deep.")] = "standard",
     llm: Annotated[bool, typer.Option("--llm/--no-llm", help="Enable AI triage.")] = False,
     timeout: Annotated[int, typer.Option(help="Seconds to wait for the scan.")] = 1800,
     poll_interval: Annotated[float, typer.Option(help="Seconds between status polls.")] = 5.0,
     sarif: Annotated[Path | None, typer.Option(help="Write SARIF here for code scanning.")] = None,
-    pdf: Annotated[
-        Path | None, typer.Option(help="Write the PDF release record here.")
-    ] = None,
-    sbom: Annotated[
-        Path | None, typer.Option(help="Write a CycloneDX SBOM here.")
-    ] = None,
+    pdf: Annotated[Path | None, typer.Option(help="Write the PDF release record here.")] = None,
+    sbom: Annotated[Path | None, typer.Option(help="Write a CycloneDX SBOM here.")] = None,
     json_out: Annotated[
         Path | None, typer.Option("--json", help="Write the verdict as JSON.")
     ] = None,
@@ -387,21 +381,15 @@ def gate(
         str, typer.Option(help="Compare against this run id instead of the linked predecessor.")
     ] = "",
     sarif: Annotated[Path | None, typer.Option(help="Write SARIF here for code scanning.")] = None,
-    pdf: Annotated[
-        Path | None, typer.Option(help="Write the PDF release record here.")
-    ] = None,
-    sbom: Annotated[
-        Path | None, typer.Option(help="Write a CycloneDX SBOM here.")
-    ] = None,
+    pdf: Annotated[Path | None, typer.Option(help="Write the PDF release record here.")] = None,
+    sbom: Annotated[Path | None, typer.Option(help="Write a CycloneDX SBOM here.")] = None,
     json_out: Annotated[
         Path | None, typer.Option("--json", help="Write the verdict as JSON.")
     ] = None,
     markdown_out: Annotated[
         Path | None, typer.Option("--markdown", help="Write a Markdown summary here.")
     ] = None,
-    warn_only: Annotated[
-        bool, typer.Option(help="Report the verdict but always exit 0.")
-    ] = False,
+    warn_only: Annotated[bool, typer.Option(help="Report the verdict but always exit 0.")] = False,
 ) -> None:
     """Re-evaluate an existing run against a policy, without re-uploading.
 

@@ -112,9 +112,7 @@ class LlmSettingsUpdate(BaseModel):
     """
 
     enabled: bool | None = None
-    roles: dict[str, str] | None = Field(
-        default=None, description="Role name to provider name."
-    )
+    roles: dict[str, str] | None = Field(default=None, description="Role name to provider name.")
     provider_models: dict[str, str] | None = Field(
         default=None, description="Provider name to model id."
     )
@@ -229,9 +227,7 @@ def connect_provider(request: ConnectProviderRequest) -> ConnectProviderResponse
 
     entry = BY_ID.get(request.catalog_id)
     if entry is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, f"unknown provider {request.catalog_id!r}"
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown provider {request.catalog_id!r}")
 
     name = (request.name or entry.id).strip()
     base_url = (request.base_url or entry.base_url).strip()
@@ -297,9 +293,7 @@ def connect_provider(request: ConnectProviderRequest) -> ConnectProviderResponse
     roles = request.assign_roles if request.assign_roles is not None else list(EDITABLE_ROLES)
     unknown = [r for r in roles if r not in EDITABLE_ROLES]
     if unknown:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY, f"unknown role(s): {unknown}"
-        )
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"unknown role(s): {unknown}")
 
     try:
         apply_update(

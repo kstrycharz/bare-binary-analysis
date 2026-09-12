@@ -34,9 +34,7 @@ def token_create(
     scope: Annotated[
         str, typer.Option(help="ci = submit and gate. admin = everything, incl. findings.")
     ] = "ci",
-    expires_in_days: Annotated[
-        int, typer.Option(help="Days until expiry. 0 means no expiry.")
-    ] = 0,
+    expires_in_days: Annotated[int, typer.Option(help="Days until expiry. 0 means no expiry.")] = 0,
     created_by: Annotated[str, typer.Option(help="Who is minting this.")] = "cli",
 ) -> None:
     """Mint a token. The plaintext is printed once and never stored."""
