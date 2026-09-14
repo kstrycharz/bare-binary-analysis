@@ -203,6 +203,8 @@ computation the gate already does, surfaced for a human rather than a pipeline.
 | Medium | The `remediate` role is routable and described in the settings UI as not-yet-wired, but nothing calls it. Either wire it or drop it from `EDITABLE_ROLES`. |
 | Low | `explain` and `summarize` have no cache: asking twice costs two calls. Triage caches by prompt hash within a pass; these do not, because they are user-initiated and low-volume. |
 | Low | Cloud provider adapters are unit-tested against their wire shapes but only OpenAI has been exercised against the live API (a deliberate 401). Anthropic and Google are untested end to end. |
+| High | Context snippets stored **before** the neighbour-masking fix in `core/rules/scanner.py` still hold adjacent secrets in the clear (ASCII, and UTF-16 as `g.h.p._...`), and triage/explain send `context_snippet` to the configured model. They cannot be re-masked without the artifact bytes. Re-scan affected artifacts, or null `context_snippet` on old evidence and findings before using a remote provider. |
+| Medium | A snippet masks every value a rule *matched*. A secret no rule recognises, sitting within 60 bytes of one that did, is still shown — the scanner cannot mask what it cannot see. |
 
 ---
 
