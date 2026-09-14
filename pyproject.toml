@@ -40,6 +40,9 @@ dev = [
     "ruff==0.8.6",
     "types-pyyaml==6.0.12.20241230",
     "httpx==0.28.1",
+    # Drives the dashboard for scripts/screenshots.py. Dev-only: nothing at
+    # runtime imports it, and the browser is fetched separately, once.
+    "playwright==1.62.0",
 ]
 
 [project.scripts]

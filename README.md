@@ -23,6 +23,8 @@ triages, explains, and investigates on top of that spine — it never invents a
 finding, and the entire pipeline runs without it. Self-hosted and air-gap
 capable: your artifacts never leave your network.
 
+![The BARE runs dashboard. The latest build, vulnerable-installer.exe, is marked BLOCKED by four critical and one high finding; below it, two completed runs with their severity counts.](docs/images/runs.png)
+
 ## Under the hood
 
 | Stage | What does the work |
@@ -59,6 +61,8 @@ environment.
   (`BARE_REQUIRE_ATTESTATION`), shipped **off** so evaluating the tool has
   no friction. Turn it on before anyone analyses an artifact they did not build.
 
+![The New scan page: a drop zone listing the installer, archive, executable and firmware formats that are unpacked recursively, then options for AI triage, secret value retention (masked and hashed by default), and the authorization reference.](docs/images/new-scan.png)
+
 See [SECURITY.md](SECURITY.md) for the third-party-artifact (due diligence)
 case.
 
@@ -73,6 +77,8 @@ Finding IDs are derived from content rather than from a sequence number, so
 they are stable across re-runs and directly comparable across releases — which
 is what lets the release gate ask "what is new since the last one?" and get a
 set difference rather than a guess.
+
+![The Detections page: 25 rules in 5 categories, a 54-entry false-positive corpus, and the rule-pack version and hash, with each rule listed by severity, id, CWE and confidence.](docs/images/rules.png)
 
 Every run records a manifest: artifact hash, rule-pack version and hash,
 analyzer image digests, and tool versions. Two runs sharing a fingerprint must
@@ -92,10 +98,14 @@ locations. The UI attributes every AI-derived field and has a
 "deterministic view only" toggle. You can always answer *"would this finding
 exist without the AI?"*
 
+![A critical "AWS access key ID" finding expanded: the rule, category, entropy, CWE and detected-by fields; the value and its surrounding context shown masked; the byte offset and encoding; and the remediation steps from the rule pack.](docs/images/findings.png)
+
 Bring your own model. Ollama runs locally on its own adapter; everything else
 goes through LiteLLM, so OpenAI, Anthropic, Google, Azure, Bedrock, Vertex,
 Groq, Mistral, DeepSeek, and the rest are a dropdown in the setup wizard rather
 than a code change.
+
+![Step 2 of the setup wizard, "Connect a model": local providers (Ollama, vLLM/LM Studio) marked LOCAL, followed by hosted providers, with a Skip for now button because the step is optional.](docs/images/setup-model.png)
 
 Egress is denied by default, and enforced where it cannot be worked around: a
 provider whose endpoint is not local is never constructed under a deny policy,
@@ -147,6 +157,10 @@ scanned in a locked-down container, and deterministic findings come back with
 byte offsets, encoding, entropy, and remediation. A policy your repository owns
 turns those into a ship / do-not-ship decision with a meaningful exit code.
 
+![A run page for vulnerable-installer.exe: an optional AI summary panel, a posture gauge showing 5 release-blocking findings, the severity mix, and exposure broken down by category.](docs/images/run-overview.png)
+
+![The artifact tree for nested-release.zip, unpacked recursively through nested archives down to the config file, with a finding count badge on each file that produced one.](docs/images/artifact-tree.png)
+
 The optional AI layer triages findings, explains one in depth, investigates one
 agentically with read-only tools, and summarises a run. All of it is advisory
 and none of it is required.
@@ -183,7 +197,11 @@ step to remember before the first scan.
 Open <http://localhost:3000>. A fresh deployment has no API token yet, so the
 dashboard opens on a one-time setup wizard: click through it, and it mints the
 first admin token and saves it for the dashboard itself — no restart, no `.env`
-edit. A headless operator gets the same token from:
+edit.
+
+![The first-run setup wizard, step 1 of 2: it explains that the API needs a credential and none exists yet, with a single Generate admin token button.](docs/images/setup-wizard.png)
+
+A headless operator gets the same token from:
 
 ```bash
 curl -X POST http://localhost:8000/api/setup/bootstrap
@@ -218,6 +236,11 @@ image they mean.
 On Windows, substitute `./make.ps1 <target>` for `make <target>`; the targets
 are identical.
 
+The screenshots in this README are generated, not hand-captured: `make
+screenshots` drives a **fresh** stack through the setup wizard, scans the
+synthetic corpus (provably invalid credentials only), and rewrites
+`docs/images/`. See [scripts/screenshots.py](scripts/screenshots.py).
+
 ## Use it as a release gate
 
 The point of scanning a shipped artifact is to stop it shipping. BARE
@@ -231,6 +254,8 @@ bare scan dist/installer.exe --sarif findings.sarif  # in CI
 It uploads the artifact, waits for the scan, evaluates a policy your repository
 owns, and exits `0` pass, `1` blocked, `2` tool error, `3` inconclusive. The
 pipeline stops on anything but `0`.
+
+![Terminal output of bare gate on the synthetic installer: BARE RELEASE GATE — BLOCKED, five blocking findings (four critical, one high) each with its full finding id, the remediation hint pointing at bare waive, and exit code 1.](docs/images/gate-blocked.png)
 
 Three defaults make it something a team will actually leave switched on:
 

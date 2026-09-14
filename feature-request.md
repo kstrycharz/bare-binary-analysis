@@ -441,7 +441,14 @@ scan duration by profile, analyzer failure rate by image, and stage degradation
 counts are all already computed and thrown away. Must not leak finding content
 into labels.
 
-### `readme-screenshots` — show the product in the README · **S**
+### ~~`readme-screenshots`~~ — show the product in the README · **S** · **DONE**
+Delivered as nine images in `docs/images/`, placed through the README with alt
+text, and generated rather than hand-captured: `make screenshots` walks a fresh
+stack through the setup wizard, scans the synthetic corpus with retention off,
+and captures the dashboard plus a blocked `bare gate`. Not captured: an AI
+explanation or investigation, which needs a configured model and would put
+model output in a picture.
+
 The README is ~280 lines of prose and not one image. Someone deciding whether to
 run `docker compose up` cannot see what they would get: the run list, the upload
 form with its attestation, a run page with findings and the artifact tree, an
