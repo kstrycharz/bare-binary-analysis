@@ -44,7 +44,8 @@ log = structlog.get_logger(__name__)
 # silently cutting.
 MAX_STORED_LOG_BYTES = 256 * 1024
 
-_STDOUT_MARKER = "[bare: log truncated]"
+# What `DockerDriver._collect_logs()` appends when its 8 MiB collection cap fires.
+_DRIVER_TRUNCATION_MARKER = "[bare: log truncated]\n"
 _STORED_TRUNCATION_NOTE = "\n[bare: stored log truncated]\n"
 
 _HEADLINE = "--- {stream} ---\n"
@@ -54,26 +55,50 @@ def render_stage_log(stdout: bytes, stderr: bytes, *, pack: RulePack) -> tuple[s
     """The retained document, and whether either stream was cut to fit.
 
     Deterministic by construction: fixed section order, one pass of the rule
-    pack over the joined text, explicit masking of every matched value. Both
+    pack over each stream, explicit masking of every matched value. Both
     streams are included even when empty so the document always reads as
     "what the container printed", not "what survived".
+
+    **Redact, then cap — never the other way round.** Capping first cuts a
+    secret that straddles the limit into a prefix no rule recognises, and that
+    prefix is then stored in the clear: `key=AKIAIO` was observed doing exactly
+    this. Scanning the whole stream is bounded by the driver's own collection
+    cap — about 5 s per stream at 8 MiB, against a scan measured in minutes —
+    and cutting already-masked text can only ever shorten a mask.
     """
     truncated = False
     parts: list[str] = []
     for name, raw in (("stdout", stdout), ("stderr", stderr)):
         text = raw.decode("utf-8", "replace")
-        if _STDOUT_MARKER in text:
+        if text.endswith(_DRIVER_TRUNCATION_MARKER):
             # The driver's own cap fired; nothing added here will make that
             # less true, but the reader should see both truncations.
             truncated = True
-        encoded = text.encode("utf-8", "replace")
+            body = text[: -len(_DRIVER_TRUNCATION_MARKER)]
+            text = _drop_partial_line(body) + _DRIVER_TRUNCATION_MARKER
+        text = redact_log_text(text, pack=pack)
+        encoded = text.encode("utf-8")
         if len(encoded) > MAX_STORED_LOG_BYTES:
-            text = encoded[:MAX_STORED_LOG_BYTES].decode("utf-8", "replace")
+            # "ignore", not "replace": a cut through a multi-byte mask glyph
+            # drops the fragment rather than inventing a character.
+            text = encoded[:MAX_STORED_LOG_BYTES].decode("utf-8", "ignore")
             text += _STORED_TRUNCATION_NOTE
             truncated = True
         parts.append(_HEADLINE.format(stream=name) + text)
 
-    return redact_log_text("\n".join(parts), pack=pack), truncated
+    return "\n".join(parts), truncated
+
+
+def _drop_partial_line(text: str) -> str:
+    """Remove the line the driver's byte cap cut through.
+
+    That cap counts bytes, not lines, so its last line can be the first
+    nineteen characters of a twenty-character key — a fragment no rule can
+    recognise and therefore none can mask. One lost line of a log already
+    past 8 MiB is the cheaper failure.
+    """
+    body = text.removesuffix("\n")  # the separator the driver puts before its marker
+    return body[: body.rfind("\n") + 1]
 
 
 def redact_log_text(text: str, *, pack: RulePack) -> str:
@@ -88,6 +113,10 @@ def redact_log_text(text: str, *, pack: RulePack) -> str:
     Values are masked longest-first so a short value that happens to be a
     substring of a longer one cannot re-expose a character of the longer
     secret's masked form.
+
+    A match is replaced in both the forms the scanner reads: plain, and
+    UTF-16LE (each character followed by a NUL), because an analyzer dumping a
+    Windows string table echoes it wide and the scanner finds it there.
     """
     if not text:
         return text
@@ -97,7 +126,9 @@ def redact_log_text(text: str, *, pack: RulePack) -> str:
     unique = dict.fromkeys(m.value for m in scan_bytes(text.encode("utf-8", "replace"), pack))
     values = sorted(unique, key=len, reverse=True)
     for value in values:
-        text = text.replace(value, mask(value))
+        masked = mask(value)
+        text = text.replace(value, masked)
+        text = text.replace("".join(f"{c}\x00" for c in value), masked)
     return text
 
 

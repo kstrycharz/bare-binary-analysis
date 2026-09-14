@@ -607,7 +607,10 @@ def get_stage_logs(
     try:
         text = read_stage_log(get_object_store(), stage.log_key)
     except Exception as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"log unreadable: {exc}") from None
+        # The detail stays generic: a storage client's exception text names
+        # endpoints and buckets, which is the operator's log, not the response.
+        log.warning("logs.read_failed", run_id=run_id, stage_id=stage_id, error=str(exc))
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "log unreadable") from None
     return PlainTextResponse(
         text,
         headers={
