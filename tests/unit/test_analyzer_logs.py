@@ -52,7 +52,8 @@ AWS_KEY = "AKIA" + "IOSFODNN7EXAMPLZ"
 AWS_SECRET = "wJalrXUtnFEMI" + "K7MDENGbPxRfiCYEXAMPLEQ"  # 13+27: the 40 the rule wants
 
 
-def test_pack() -> Any:
+# Not `test_pack`: pytest collects any module-level `test_*` function as a test.
+def _pack() -> Any:
     return load_rule_pack(RULES_DIR)
 
 
@@ -92,7 +93,7 @@ class _FakeStore:
 
 class TestRedaction:
     def test_a_credential_echoed_in_a_log_is_masked(self) -> None:
-        pack = test_pack()
+        pack = _pack()
         text = f"opening config: aws_access_key_id={AWS_KEY} secret={AWS_SECRET}\n"
         out = redact_log_text(text, pack=pack)
         assert AWS_KEY not in out
@@ -100,27 +101,36 @@ class TestRedaction:
         assert "AKIA" in out  # recognisable shape survives; the value does not
 
     def test_benign_log_text_is_untouched(self) -> None:
-        pack = test_pack()
+        pack = _pack()
         text = "scanning 412 files\nmatched rule: none\n"
         assert redact_log_text(text, pack=pack) == text
 
     def test_redaction_is_deterministic(self) -> None:
-        pack = test_pack()
+        pack = _pack()
         text = f"both: {AWS_KEY} {AWS_SECRET} and again {AWS_KEY}\n"
         a, b = redact_log_text(text, pack=pack), redact_log_text(text, pack=pack)
         assert a == b
 
+    def test_a_wide_string_echo_is_masked(self) -> None:
+        """An analyzer dumping a Windows string table echoes it as UTF-16LE,
+        and the scanner finds it there; replacing only the plain form would
+        leave the wide one intact."""
+        pack = _pack()
+        wide = "".join(f"{c}\x00" for c in AWS_KEY)
+        out = redact_log_text(f"dump: {wide}\n", pack=pack)
+        assert wide not in out
+
 
 class TestRender:
     def test_both_streams_appear_as_text_sections(self) -> None:
-        pack = test_pack()
+        pack = _pack()
         document, truncated = render_stage_log(b"out line\n", b"err line\n", pack=pack)
         assert not truncated
         assert "--- stdout ---" in document and "out line" in document
         assert "--- stderr ---" in document and "err line" in document
 
     def test_a_chatty_analyzer_cannot_grow_the_document_without_bound(self) -> None:
-        pack = test_pack()
+        pack = _pack()
         chatty = (b"x" * 4096 + b"\n") * (MAX_STORED_LOG_BYTES // 4096 * 3)
         document, truncated = render_stage_log(chatty, b"", pack=pack)
         assert truncated
@@ -130,21 +140,91 @@ class TestRender:
         assert len(document.encode("utf-8")) <= 2 * MAX_STORED_LOG_BYTES + 4096
 
     def test_the_driver_cap_note_is_reported_as_truncated(self) -> None:
-        pack = test_pack()
+        pack = _pack()
         document, truncated = render_stage_log(b"[bare: log truncated]\n", b"", pack=pack)
         assert truncated and "log truncated" in document
 
     def test_undecodable_bytes_survive_as_replacement_text(self) -> None:
         """Analyzer output is untrusted; a byte that is not valid UTF-8 must
         not fail the retention, only read oddly."""
-        pack = test_pack()
+        pack = _pack()
         document, _ = render_stage_log(b"caf\xe9\xff\xfe bytes\n", b"", pack=pack)
         assert "bytes" in document
+
+    @pytest.mark.parametrize("cut", [1, 6, 12, 19])
+    def test_a_secret_straddling_the_retention_cap_is_not_stored_in_part(self, cut: int) -> None:
+        """Capping before redacting stored `key=AKIAIO` in the clear: a prefix
+        of a key is something no rule recognises, so the cap must never be the
+        thing that produces one. ``cut`` is how many characters of the key
+        fall inside the cap."""
+        pack = _pack()
+        line = b"scanning file ok\n"
+        filler_len = MAX_STORED_LOG_BYTES - len(b"key=") - cut
+        filler = (line * (filler_len // len(line) + 1))[:filler_len]
+        stdout = filler + b"key=" + AWS_KEY.encode() + b"\nmore output\n"
+
+        document, truncated = render_stage_log(stdout, b"", pack=pack)
+
+        assert truncated
+        # mask() keeps the four-character AKIA prefix; a fifth real character
+        # surviving means part of the key itself was stored.
+        assert AWS_KEY[:5] not in document
+
+    def test_the_line_the_driver_cap_cut_through_is_dropped(self) -> None:
+        """The driver's 8 MiB cap counts bytes, so its last line can be a key
+        fragment that never reached the worker whole and cannot be matched."""
+        pack = _pack()
+        fragment = AWS_KEY[:12]
+        raw = b"opened archive\nkey=" + fragment.encode() + b"\n[bare: log truncated]\n"
+
+        document, truncated = render_stage_log(raw, b"", pack=pack)
+
+        assert truncated
+        assert "opened archive" in document
+        assert "[bare: log truncated]" in document
+        assert fragment not in document
+
+
+class TestAFailingAnalyzer:
+    """The bounty's acceptance case: a deliberately failing analyzer has to
+    leave its output behind, redacted, on the stage row the dashboard reads."""
+
+    def test_a_failed_stage_keeps_its_log_and_a_redacted_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import core.pipeline.scan as scan
+        from core.sandbox import SandboxResult, SandboxSpec, SandboxStatus
+
+        store = _FakeStore()
+        monkeypatch.setattr(scan, "get_object_store", lambda: store)
+        stage = RunStage(id="stage-failed", run_id="run-failed", analyzer="static")
+        spec = SandboxSpec(image="bare/analyzer-static:dev", run_id="run-failed", analyzer="static")
+        traceback = f"Traceback (most recent call last):\nValueError: bad config {AWS_KEY}\n"
+        result = SandboxResult(
+            spec=spec,
+            status=SandboxStatus.COMPLETED,
+            exit_code=2,
+            stdout=b"scanning 3 files\n",
+            stderr=traceback.encode(),
+            started_at=NOW,
+            finished_at=NOW,
+        )
+
+        scan._record_stage(stage, result, pack=_pack())
+
+        assert stage.status == StageStatus.FAILED
+        assert stage.log_key == stage_log_key("run-failed", "stage-failed")
+        stored = store.bucket_obj.objects[stage.log_key].decode()
+        assert "scanning 3 files" in stored and "ValueError: bad config" in stored
+        assert AWS_KEY not in stored
+        # `error` is served on every run detail response, CI scope included.
+        assert stage.error is not None and "ValueError: bad config" in stage.error
+        assert AWS_KEY not in stage.error
 
 
 class TestStore:
     def test_roundtrip_and_key_shape(self) -> None:
-        pack = test_pack()
+        pack = _pack()
         store = _FakeStore()
         key, size, truncated = store_stage_log(
             store,  # type: ignore[arg-type]
@@ -169,7 +249,7 @@ class TestStore:
             def client(self) -> Any:
                 raise RuntimeError("minio unreachable")
 
-        pack = test_pack()
+        pack = _pack()
         key, size, truncated = store_stage_log(
             _Broken(),  # type: ignore[arg-type]
             run_id="run-1",
@@ -187,7 +267,7 @@ class TestStore:
 @pytest.fixture
 def app_client(
     monkeypatch: pytest.MonkeyPatch,
-) -> Iterator[tuple[TestClient, sessionmaker[Session], _FakeStore]]:
+) -> Iterator[tuple[TestClient, sessionmaker[Session], _FakeStore, str]]:
     """Real app, throwaway SQLite, and the bucket faked at the seam.
 
     The store is patched where the router resolves it — a scan writing logs

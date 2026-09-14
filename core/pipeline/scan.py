@@ -31,7 +31,7 @@ from core.models import Artifact, Evidence, Run, RunManifest, RunStage, Suppress
 from core.models.base import new_uuid
 from core.models.enums import RunStatus, StageStatus
 from core.pipeline.correlator import correlate
-from core.pipeline.logs import store_stage_log
+from core.pipeline.logs import redact_log_text, store_stage_log
 from core.pipeline.stages import degraded_stages, describe_degraded
 from core.rules import load_rule_pack
 from core.rules.model import RulePack
@@ -585,8 +585,13 @@ def _record_stage(stage: RunStage, result: SandboxResult, *, pack: RulePack) -> 
     stage.duration_s = round(result.duration_s, 3)
     stage.exit_code = result.exit_code
     stage.image_digest = result.image_digest
+    # The stderr excerpt is the same untrusted analyzer output as the retained
+    # log, served on every run detail response — so it gets the same
+    # redaction, applied before the 2000-character cut for the same reason.
     stage.error = result.error or (
-        result.stderr.decode("utf-8", "replace")[:2000] if result.exit_code else None
+        redact_log_text(result.stderr.decode("utf-8", "replace"), pack=pack)[:2000]
+        if result.exit_code
+        else None
     )
     stage.status = {
         SandboxStatus.COMPLETED: (
