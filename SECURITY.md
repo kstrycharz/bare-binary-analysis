@@ -76,14 +76,17 @@ A tool that finds secrets is itself a concentrated store of secrets. Therefore:
 
 - Discovered values are stored **hashed and masked** by default. Reports show
   masked values.
-- Plaintext retention is opt-in per run, encrypted at rest, with a TTL and an
-  auto-purge job.
-- Plaintext export requires separate authorization and is itself an audited
-  event.
-- RBAC: `admin` / `analyst` / `viewer`, with `viewer` unable to reveal
-  plaintext.
-- Every upload, config change, plaintext reveal, LLM call, export, and
-  suppression is written to an append-only, exportable audit log.
+- Plaintext retention is opt-in per run. **Today retained values are stored
+  unencrypted and never expire**; encryption at rest, a per-run deadline, and an
+  audited purge are in review (#12). Leave it off unless a run needs the values.
+- Access is by API token with two scopes (ADR-0023): `admin` may read findings
+  and retained values; `ci` may submit artifacts and receive a gate verdict, and
+  nothing else. There are no per-user roles or SSO yet (M6).
+- The append-only audit log records uploads, attestations, rejected
+  credentials, token creation and revocation, finding status changes, and run
+  recovery. It does **not** yet record plaintext reveals, settings changes,
+  report exports, or suppressions (the `audit-completeness` bounty). Model calls
+  are recorded separately, in `llm_calls`.
 
 If BARE finds a live credential in your artifact, **rotate it.** Removing
 it from the next build is not sufficient — the version already shipped is still

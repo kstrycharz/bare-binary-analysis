@@ -191,6 +191,12 @@ Each stage is a Celery task producing `Evidence` rows.
 | **S7 Triage** | LLM classification, explanation, remediation | M3 |
 | **S8 Report** | PDF, HTML, SARIF, CycloneDX, JSON | M4 |
 
+The table is the design; the milestone column is when each part was planned,
+not a claim that all of it shipped. Not built today: SSDEEP/TLSH hashing, YARA,
+UPX unpacking, RTTI and Rich-header extraction, HTML reports, and all of S4 and
+S5. Reports ship as PDF, SARIF, CycloneDX, and JSON. The README's "Under the
+hood" table lists the tools that actually do the work.
+
 Two details that decide whether the tool is useful:
 
 - **UTF-16LE strings.** Windows binaries hide half their secrets in wide
@@ -208,10 +214,13 @@ as separate metrics.
 
 ## Data model
 
-Core tables: `runs`, `run_manifests`, `artifacts` (self-referencing tree via
-`parent_id`), `evidence`, `findings`, `finding_locations`, `investigations`
-(+ `investigation_steps` for the replayable tool-call trace), `llm_calls`,
-`audit_log`, `rules`, `suppressions`, `users`, `api_tokens`.
+Core tables: `runs`, `run_manifests`, `run_stages`, `artifacts`
+(self-referencing tree via `parent_id`), `evidence`, `findings`,
+`finding_locations`, `llm_calls`, `audit_log`, `suppressions`, `api_tokens`.
+An investigation's conclusion and replayable tool-call trace live on the
+finding (`llm_investigation`, `llm_investigation_steps`) rather than in tables
+of their own. Rules are YAML under `detections/`, not rows, and there is no
+`users` table: access is by scoped API token (ADR-0023).
 
 ```
 Finding
@@ -230,10 +239,11 @@ Finding
 The artifact tree is a real tree, not a flat list: the report must be able to
 say "in `setup.exe` → `app.7z` → `resources/app.asar` → `config/prod.json`".
 
-Suppressions key on `value_hash` + rule + artifact-path pattern and are portable
-across runs via a checked-in `.bare-ignore.yaml`. If a user cannot
-suppress a known-benign finding once and have it stay suppressed, they stop
-using the tool by week three.
+Suppressions key on `value_hash` + rule + artifact-path pattern, live in the
+`suppressions` table, and are applied during every scan. The planned checked-in
+`.bare-ignore.yaml` that would carry them between deployments does not exist
+yet. If a user cannot suppress a known-benign finding once and have it stay
+suppressed, they stop using the tool by week three.
 
 Run diffing is first-class, not an afterthought — "what is new since the last
 release" is the question CI actually asks.
@@ -242,11 +252,12 @@ release" is the question CI actually asks.
 
 ## The BYOLLM layer
 
-`LLMProvider` exposes `complete()`, `stream()`, `tool_call()`, `embed()`,
-`count_tokens()`, `capabilities()`, `health()`. Adapters: Ollama (default,
-local), OpenAI (whose custom `base_url` also covers Together, Groq, OpenRouter,
-Fireworks, DeepSeek, Mistral, vLLM, and llama.cpp), Anthropic, Google, Azure
-OpenAI, AWS Bedrock.
+`LLMProvider` exposes `complete()`, `capabilities()`, `health()`, and
+`count_tokens()`. There are two adapters: `OllamaProvider` for local models, and
+`LiteLLMProvider` for every hosted vendor — OpenAI, Anthropic, Google, Azure,
+Bedrock, Vertex, Groq, Mistral, DeepSeek, and anything with an OpenAI-compatible
+endpoint (ADR-0027). Streaming, native tool calls, and embeddings are not part
+of the interface.
 
 `capabilities()` reports native tool calling, structured output, context window,
 and max output tokens, and the orchestrator degrades gracefully: no tool calling
@@ -262,19 +273,20 @@ local model and low-volume explanation to a frontier model.
 Customers are sending their crown-jewel IP. This layer is why they will or will
 not adopt the tool.
 
-- Egress policy is enforced at the HTTP-client level, not by convention: a
-  request to a non-allowlisted host raises. Air-gapped mode makes cloud adapters
-  fail at config-validation time, not at request time.
+- Egress policy is enforced in code, not by convention (`EgressPolicyGuard`,
+  ADR-0027): loopback and private addresses count as local, anything else raises
+  under a deny policy, and air-gapped mode forbids every non-local provider.
 - Candidate secret plaintext is **never** sent to a remote provider. Shape,
   entropy, rule name, masked context (`sk-live-••••••••••••4f2a`), and offsets
   only. Local providers may receive plaintext solely under a distinct, explicit
   opt-in.
-- Identified customer data is redacted from context windows before remote calls.
-- Every outbound call is logged: provider, model, role, token counts, prompt
-  hash, redaction level, and a replayable record. "What exactly did you send to
-  OpenAI?" must have a precise answer.
-- `--llm-dry-run` renders every prompt to disk without sending, so a security
-  team can review actual egress before approving the tool.
+  Until #14 lands, a snippet masks only its own finding's value, so a
+  neighbouring secret can still reach the model.
+- Customer data (emails, names, IPs) is **not** redacted beyond secret masking.
+- Every outbound call is recorded in `llm_calls`: provider, model, role,
+  locality, redaction level, prompt hash, the exact rendered prompt, response,
+  and token counts. "What exactly did you send to OpenAI?" has a precise answer.
+- There is no prompt dry-run mode yet; the recorded prompts are the review trail.
 
 ---
 

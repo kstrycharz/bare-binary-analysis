@@ -106,6 +106,76 @@ def list_runs(
     return [_summarise(session, run) for run in runs]
 
 
+def _runs_fingerprint(rows: Sequence[tuple[str, str]]) -> str:
+    """The identity of the run list as the dashboard sees it: ids and statuses.
+
+    Deliberately *not* the full `RunSummary`s. The runs page calls `_summarise`
+    per row — four queries each — and a channel that refreshed the list every
+    two seconds would put that cost on every open tab. What the client needs to
+    know is only whether the server-rendered list it is holding can still be
+    true. It can be, exactly when this fingerprint is unchanged.
+    """
+    return json.dumps([list(row) for row in rows])
+
+
+async def _stream_run_list_events(
+    ticks: int = 600, *, max_events: int | None = None, poll_s: float = 2.0
+) -> AsyncIterator[str]:
+    """The body of the stream, drivable by tests without a live connection.
+
+    *ticks* frames of *poll_s* seconds each; EventSource reconnects when the
+    generator ends, so a long-lived client costs nothing between changes.
+    *max_events* bounds emissions rather than frames — for a test that wants
+    the first N frames without arranging for the stream to end.
+
+    Tie-break on id so two runs created in the same instant produce the same
+    fingerprint on every poll (determinism, §8).
+    """
+    last: str | None = None
+    emitted = 0
+    for _ in range(ticks):
+        with session_scope() as session:
+            rows = session.execute(
+                select(Run.id, Run.status).order_by(Run.created_at.desc(), Run.id).limit(200)
+            ).all()
+        fingerprint = _runs_fingerprint([(row[0], row[1]) for row in rows])
+        if fingerprint != last:
+            # The payload is a count and a change flag — never run names or
+            # statuses: this stream is open in every dashboard tab, and "has
+            # the list changed" is the question, not "what does the list say".
+            # The client re-reads the real list over the authenticated,
+            # redacted API path when the answer is yes.
+            yield _sse({"changed": last is not None, "runs": len(rows)})
+            last = fingerprint
+            emitted += 1
+            if max_events is not None and emitted >= max_events:
+                return
+        await asyncio.sleep(poll_s)
+
+
+@router.get("/events", summary="Run-list change stream (SSE)")
+async def stream_run_list() -> StreamingResponse:
+    """Emit one event whenever the set of runs or their statuses changes.
+
+    This is the Runs tab's wake-up signal, and it is a separate route from the
+    per-run stream because it answers a different question: not "how is this
+    scan doing" but "has the list you rendered seconds ago changed at all".
+    Cheap by construction — one indexed select per poll, no per-row
+    summarisation — because unlike the run page, every dashboard tab holds this
+    one open at once.
+
+    Declared before ``/{run_id}`` so that ``events`` is never treated as a run
+    id. (Run ids are UUIDs, so a real collision is impossible; FastAPI matches
+    routes in declaration order, so a collision is still avoided by ordering
+    rather than by luck.)
+    """
+    return StreamingResponse(
+        _stream_run_list_events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @router.get("/{run_id}", response_model=RunDetail)
 def get_run(run_id: str, session: Annotated[Session, Depends(get_session)]) -> RunDetail:
     run = session.get(Run, run_id)

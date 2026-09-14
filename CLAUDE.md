@@ -50,7 +50,9 @@ with offsets, encoding, and remediation. Optional AI triage classifies them,
 explains individual findings, investigates them agentically with read-only
 tools, and summarises a run. A release policy turns
 those findings into a ship / do-not-ship decision with a meaningful exit code,
-so BARE is a build-pipeline stage gate and not only a dashboard.
+so BARE is a build-pipeline stage gate and not only a dashboard. Analyzer
+output is kept per stage, redacted at write time (ADR-0032); `bare waive` writes
+waivers the gate will honour, and `bare sbom-diff` compares two builds.
 
 Deployment is two commands and no file editing — the dashboard's first-run
 wizard mints the API token and optionally connects a model:
@@ -95,7 +97,7 @@ make install && make sandbox-check     # ./make.ps1 on Windows
 - CI runs lint, mypy strict, unit tests, the isolation suite, a gitleaks scan,
   the web build, and a stack-boots check.
 
-Verified: 696 unit tests, 19 integration tests, `mypy --strict` clean on
+Verified: 756 unit tests, 19 integration tests, `mypy --strict` clean on
 `core/`, `ruff` clean, `next build` clean.
 
 Not yet started: Ghidra and dynamic analysis (M5), MCP servers (M5), and the
@@ -144,6 +146,7 @@ Append-only; supersede rather than edit.
 - **ADR-0030** — The packaged LLM config ships inert (2026-08-27)
 - **ADR-0032** — Analyzer logs are retained in object storage, redacted at write time (2026-09-11)
 - **ADR-0033** — Beat's healthcheck is its own scheduler tick, written to a file and read by age (2026-09-11)
+- **ADR-0031** — The Runs list refreshes on a fingerprint event, not on polling the list (2026-09-11)
 
 ---
 
@@ -169,6 +172,7 @@ mostly about the tool being *lived with* rather than demonstrated.
    TTL, and auto-purge. None of the three exists, so a run scanned with
    retention on leaves real secrets in Postgres indefinitely. The UI says so at
    the point of choosing, which is not the same as the promise being kept.
+   In review as #12.
 3. **The Go string-blob problem** (§6). It affects every rule on every Go
    binary and needs a Go-aware splitter, not a per-rule patch.
 4. **Decide about `remediate`.** It is routable and described in the settings
@@ -187,10 +191,13 @@ computation the gate already does, surfaced for a human rather than a pipeline.
 | Medium | `PodmanDriver` and `GvisorDriver` raise `NotImplementedError`. Scheduled M6. Rootless Podman is a hard requirement for some enterprises. |
 | Medium | `NetworkMode.SINKHOLE` raises in `DockerDriver._build_create_kwargs`. Dynamic analysis lands M5. Failing loudly is deliberate — a silent fallback to a bridge would hand an artifact real egress. |
 | Medium | The seccomp allowlist has only been exercised against a slim Python image. Ghidra (JVM) and Wine are likely to need additions. Validate per image as they are built; do not weaken the profile globally in response to one failure. |
-| Medium | `_active_run_ids()` in `core/orchestrator/tasks.py` returns `None` until the `runs` table exists, degrading the reaper to age-based cleanup. Wire it in M1. |
+| Medium | `_active_run_ids()` in `core/orchestrator/tasks.py` returns `None` until the `runs` table exists, degrading the reaper to age-based cleanup. M1 is complete and it is still not wired. |
 | Medium | The artifact tree in the run detail response is capped at 500 nodes. The count stays exact and every artifact is still scanned, but there is no way to page through the rest — a real explorer needs its own paginated endpoint. |
-| Low | `ManifestOut` exposes neither `recon` nor `components`; both are reachable only through their own endpoints. Fine for now, surprising if you read the schema. |
-| Low | `make corpus` and `make airgap-bundle` exit 1 with a pointer to their milestone (M2, M6). |
+| High | Context snippets mask only their own finding's value. Neighbouring secrets in the 60-byte window — the other half of a credential pair, or a UTF-16 string that reads as `g.h.p._...` — are stored in the clear, and triage and explain send them to the model as "value masked". `llm_calls.prompt_rendered` keeps the exact prompt, so past calls hold them too. Fix in review: #14. |
+| High | `DockerDriver` reports OOM only when Docker sets `State.OOMKilled`. A process killed quickly under cgroup v2 can exit 137 without it and is reported `COMPLETED`, so the stage is not degraded and the gate can pass a scan that did not finish (ADR-0018). This is what makes `test_memory_hog_is_stopped_and_diagnosed_as_oom` flaky in CI. |
+| Medium | The audit log records uploads, attestations, rejected credentials, token changes, finding status changes, and run recovery — not plaintext reveals, settings changes, report exports, or suppressions. Retained values come back inside ordinary findings responses with no record of who looked. See the `audit-completeness` bounty. |
+| Low | `ManifestOut` exposes neither `recon` nor `components`. Components are reachable as CycloneDX through `/api/runs/{id}/sbom`; the recon inventory is exposed by no endpoint at all (see the `re-view` bounty). |
+| Low | `make airgap-bundle` exits 1 with a pointer to its milestone (M6). |
 | Low | Base image digests are pinned inline in Dockerfiles. `make refresh-digests` prints current values but does not rewrite them. |
 
 | Medium | Go binaries store strings in one contiguous blob with no separators, so the printable-run extractor merges adjacent unrelated strings and a regex can match across the seam. Observed: `…per_page=30reflect:` and `dllsecur32.dllshell32.dlluserenv.dlltime`. Affects every rule on Go artifacts; needs a Go-aware string splitter, not a per-rule fix. |
@@ -198,7 +205,7 @@ computation the gate already does, surfaced for a human rather than a pipeline.
 | Medium | The release gate has no native GitHub Action or GitLab component; `docs/CICD.md` calls the CLI directly, which works everywhere but is more wiring than a marketplace action. |
 | Medium | `first_seen_run_id` on `Finding` is never populated. The gate computes "is new" from the baseline run's id set instead, which is correct but means the column is dead weight. |
 | Low | `click` is pinned to 8.1.8 to work around typer 0.15.1 (ADR-0020). Revisit when typer supports click 8.2+. |
-| Medium | Plaintext retention has no TTL and no auto-purge, and nothing encrypts it at rest. A run scanned with "Retain full plaintext values" leaves real secrets in Postgres indefinitely. The UI says so at the point of choosing, but §9 promises a TTL that does not exist yet. |
+| Medium | Plaintext retention has no TTL and no auto-purge, and nothing encrypts it at rest. A run scanned with "Retain full plaintext values" leaves real secrets in Postgres indefinitely. The UI says so at the point of choosing, but §9 promises a TTL that does not exist yet. Fix in review: #12. |
 | Medium | Investigation quality tracks the model hard. On a local 14b the loop runs correctly — it searches, probes encodings, and terminates — but the conclusion is often generic ("review the file and ensure it does not contain sensitive information"). The mechanism is sound; the prose needs a better model or a larger `num_ctx`, and the default routing sends `investigate` to the fast model. |
 | Low | An investigation re-reads no earlier tool output once it falls outside `MAX_CONTEXT_TURNS`; the model is told steps were omitted but cannot get them back. Fine at 12 steps, wrong if the cap ever rises much. |
 | Medium | The `remediate` role is routable and described in the settings UI as not-yet-wired, but nothing calls it. Either wire it or drop it from `EDITABLE_ROLES`. |

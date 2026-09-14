@@ -798,23 +798,46 @@ asked. Making the probe fast is the fix; making it rare is an evasion.
 
 ---
 
-## ADR-0032 — Analyzer logs are retained in object storage, redacted at write time
+## ADR-0031 — The Runs list refreshes on a fingerprint event, not on polling the list
 
 **Date:** 2026-09-11
 **Status:** Accepted
 
 ### Context
 
-`DockerDriver._collect_logs()` already reads stdout/stderr and caps them at
-8 MiB, but the bytes then died on the `SandboxResult`: `RunStage` had an
-`error` column and nothing else, so a degraded scan could not be diagnosed
-after the fact — the container it would `docker logs` had already been reaped
-(ADR-0003). The bounty (`analyzer-logs`) names three hazards: the logs are
-untrusted output derived from a customer's binary, they can contain secrets
-the analyzer was looking at, and a 213 MB installer can make them large.
+The Runs tab is the homepage, a `force-dynamic` server component with no
+client-side refresh. Two failure modes followed (bounty: `runs-live`): sitting
+on the page, a run started from the CLI or CI never appeared and a running row
+never advanced; and navigating *back* to the page could serve the RSC payload
+App Router cached on the client, because a client-side navigation makes no
+request for a `force-dynamic` page to be dynamic about.
+
+The obvious fix — poll `GET /api/runs` — has a cost the bounty called out by
+name: `_summarise()` runs four queries per row, per poll, per open tab. On a
+deployment with a few hundred runs and a few dashboards, the list endpoint
+becomes the busiest thing in the API for no information nobody was reading.
 
 ### Decision
 
+`GET /api/runs/events`, one SSE stream per tab, polls *only*
+`SELECT id, status FROM runs ORDER BY created_at DESC, id LIMIT 200` — one
+indexed query, unchanged or changed — and emits a frame only when that
+fingerprint differs from the last. The frame carries `{changed, runs}`: no
+names, no severities, no findings. Any change to the list as the dashboard sees
+it — a new run, a status transition, a deletion — is one frame; the client
+coalesces frames through a 400 ms quiet period into one `router.refresh()`.
+
+The data path stays single-sourced: the event says *"the server-rendered list
+you hold can no longer be true"*, and the refresh re-runs the server component
+over the authenticated, redacted, scoped API. The stream is a wake-up signal,
+not a second truth, which is why it is allowed to be this cheap and this
+unauthenticated-by-content.
+
+Client behaviour that covers the second failure mode: the wrapper issues one
+coalesced refresh on mount (a cached-RSC back-navigation re-fetches once, the
+same round-trip a hard reload already pays) and re-opens the stream plus one
+refresh whenever the tab becomes visible again — hidden tabs hold no poller,
+and "it finished while I was away" should be true on return.
 **Pointer on the row, bytes in the bucket.** `RunStage` gains `log_key`
 (text, nullable), `log_bytes`, and `log_truncated` — all fixed-width — and
 the document itself goes into the artifact bucket under a `logs/{run_id}/
@@ -872,18 +895,12 @@ would be a lie about a different truth.
 
 ### Alternatives rejected
 
-**A Text column on `run_stages`.** Every `RunStage` read — the progress
-stream polls the table every two seconds — would drag up to 8 MiB of log
-through the ORM. The run table is a hot path; a log is a cold one.
+**Poll `GET /api/runs` on an interval.** Four queries per row per tab per tick
+for the answer "probably nothing changed." The bounty itself calls this out.
 
-**Object storage only, no columns.** Then "does this stage have a log?" —
-which the UI must answer per row on render — costs a HEAD per stage per page
-view, and `log_truncated` has nowhere to live.
-
-**LLM-layer redaction reuse.** The provider-layer redaction is shaped for
-*prompts to models* (what may leave the box). This is retention on the box;
-keying it off the rule pack ties the guarantee to "the same detectors that
-wrote the findings", which is the sentence an auditor needs.
+**Extend the per-run `/events` stream.** A dashboard tab does not know every
+run id — the page's whole problem is runs it has never seen. A multiplexed
+per-run fan-out stream is a different, heavier object than a list fingerprint.
 
 **Storing unredacted and redacting on read.** Every read becomes a
 rule-pack scan of 512 KiB, a future read path can forget to do it, and the
@@ -958,3 +975,10 @@ which is the wrong diagnostic.
 
 **Extending the worker healthcheck to cover beat.** Different failure
 domains; ADR-0029's point is that each container's check reports on itself.
+**Push from the write path (worker/API emits on status change).** Truly event-
+driven, but every path that mutates `runs` — worker, beat's reaper, the CLI
+creating a run, a cancellation — would have to remember to publish, through
+Redis, and any missed one is a frozen tab with no way to notice. A two-second
+fingerprint poll cannot miss, because it reads the truth rather than trusting
+someone to have announced it. The cost the rejected poll had (per-row work) is
+exactly what this design removes.

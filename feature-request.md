@@ -69,6 +69,8 @@ no network and no Docker socket — that are not up for negotiation in a PR.
 
 Delivered as `GET /api/runs/{id}/stages/{stage_id}/logs` + a disclosure column on the
 stages table; retention in object storage with write-time redaction (ADR-0032).
+Landed in #6; #13 then moved redaction ahead of the byte cap, so a cut through the
+middle of a key can no longer store its prefix.
 
 <details>
 <summary>Original bounty</summary>
@@ -159,7 +161,8 @@ So progress has to travel out some way that respects the boundary. Two plausible
 routes, and part of the bounty is arguing for one:
 
 - The analyzer emits progress lines on **stdout**, which the worker is already
-  reading. Cheap, and it composes with the `analyzer-logs` bounty above.
+  reading. Cheap, and it builds on `analyzer-logs` (done), which already keeps
+  that output per stage.
 - The analyzer writes a **heartbeat file** into its writable `/output` mount,
   which the worker polls. Survives buffering better; costs a polling loop.
 
@@ -220,6 +223,8 @@ against the three small Python ones that already agree with each other.
 ---
 
 ### `runs-live` — the Runs tab does not show runs that are running · **S**
+
+**In review:** #5.
 
 Start a scan, click **Runs**, and the run you just started is often not there.
 
@@ -375,7 +380,7 @@ a worked example to copy in `core/orchestrator/health.py`.
 
 ### `waive` — `bare waive <id>` · **S**
 ### ~~`waive`~~ — `bare waive <id>` · **S** · **DONE**
-Delivered as `bare waive`. Building it turned up the real bug: the gate's text
+Delivered as `bare waive` (#10). Building it turned up the real bug: the gate's text
 output printed a 12-character id prefix, and waivers match the full id exactly,
 so a waiver copied from a red build never applied. The output now prints the
 full id, and `bare waive` refuses a prefix and says why.
@@ -386,6 +391,9 @@ is where waivers acquire missing owners and absent expiries. Wanted:
 Should refuse to write a waiver with no expiry.
 
 ### `retention-ttl` — make the plaintext promise true · **M**
+**In review:** #12 — AES-GCM at rest with the key outside Postgres, a per-run
+deadline enforced on every read, and an audited scheduled purge.
+
 `CLAUDE.md` §9 promises that retained plaintext is encrypted at rest, has a TTL,
 and is auto-purged. None of the three exists. A run scanned with retention
 enabled leaves real secrets in Postgres indefinitely. The UI says so at the point
@@ -404,7 +412,7 @@ run. That computation exists and is tested; it is just not surfaced anywhere a
 human can look. Mostly a UI bounty on top of logic that is already correct.
 
 ### ~~`sbom-diff`~~ — what changed between two builds · **S** · **DONE**
-Delivered as `bare sbom-diff A B`, where each side is a run id or an SBOM file.
+Delivered as `bare sbom-diff A B` (#11), where each side is a run id or an SBOM file.
 Components match on purl identity without the version, so an upgrade is one
 change rather than a removal and an addition; licence changes are reported too,
 and a diff against an incomplete inventory says so.
@@ -469,6 +477,17 @@ the prose already describes them, each with real alt text.
 
 **Done when:** a first-time reader can see the dashboard and a blocked CI run
 without installing anything, and the images can be regenerated with one command.
+
+### `audit-completeness` — record what an auditor expects to find · **M**
+The audit log today records uploads, attestations, rejected credentials, token
+creation and revocation, finding status changes, and run recovery. It does not
+record plaintext reveals, settings changes, report exports, or suppressions —
+the events a reviewer would look for first. Reveals matter most: retained values
+come back inside ordinary findings responses, so there is no record of who
+looked. Wanted: a dedicated admin-scoped reveal endpoint that writes
+`plaintext_revealed` (never the values themselves), and audit records for
+settings changes, exports, and suppressions. Model calls already land in
+`llm_calls`; say in the PR whether that is enough.
 
 ### `dogfood` — scan BARE's own releases · **S**
 The README claims BARE is a build-pipeline stage gate. Nothing currently verifies
