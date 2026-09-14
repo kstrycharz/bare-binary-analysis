@@ -224,7 +224,7 @@ def test_json_output_carries_the_exit_code() -> None:
 
 def test_markdown_output_is_a_table_a_reviewer_can_read() -> None:
     rendered = render_markdown(_blocked_verdict(), artifact="installer.exe", run_url="http://x/1")
-    assert "| Severity | Finding | Location | Why |" in rendered
+    assert "| Severity | Finding | Location | Why | Id |" in rendered
     assert "aws" in rendered.lower()
     assert "http://x/1" in rendered
 
