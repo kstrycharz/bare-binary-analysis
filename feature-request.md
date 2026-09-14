@@ -219,12 +219,7 @@ against the three small Python ones that already agree with each other.
 
 ---
 
-### ~~`runs-live`~~ — the Runs tab does not show runs that are running · **S** · **DONE**
-
-Delivered as `GET /api/runs/events` + the `RunsLive` wrapper (ADR-0031).
-
-<details>
-<summary>Original bounty</summary>
+### `runs-live` — the Runs tab does not show runs that are running · **S**
 
 Start a scan, click **Runs**, and the run you just started is often not there.
 
@@ -256,8 +251,6 @@ run-list events, or poll at a sane interval and only while a run is active.
 
 **Done when:** starting a scan in one tab makes it appear in the Runs tab of
 another without a manual reload, and a completing run updates in place.
-
-</details>
 
 ---
 
