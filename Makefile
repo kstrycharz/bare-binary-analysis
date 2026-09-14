@@ -153,6 +153,11 @@ demo: images corpus run-root ## End-to-end: boot the stack, scan a planted artif
 	$(COMPOSE_DEV) up -d --build
 	$(PY) python scripts/demo.py
 
+.PHONY: screenshots
+screenshots: corpus ## Regenerate docs/images from a FRESH running stack (synthetic data only)
+	$(PY) playwright install chromium
+	$(PY) python scripts/screenshots.py
+
 .PHONY: airgap-bundle
 airgap-bundle: ## Produce the offline install tarball (M6)
 	@echo "make airgap-bundle is not implemented yet; scheduled for M6 (see CLAUDE.md)" >&2

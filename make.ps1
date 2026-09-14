@@ -124,6 +124,11 @@ $Targets = [ordered]@{
         Invoke-Docker ($ComposeDev + @('up', '-d', '--build'))
         Invoke-Uv @('python', 'scripts/demo.py')
     }
+    'screenshots'      = {
+        & $PSCommandPath 'corpus'
+        Invoke-Uv @('playwright', 'install', 'chromium')
+        Invoke-Uv @('python', 'scripts/screenshots.py')
+    }
     'airgap-bundle'    = { throw 'make airgap-bundle is not implemented yet; scheduled for M6 (see CLAUDE.md)' }
 }
 
