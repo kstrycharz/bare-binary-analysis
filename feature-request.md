@@ -378,7 +378,12 @@ The gate already computes "what did this build introduce" against a baseline
 run. That computation exists and is tested; it is just not surfaced anywhere a
 human can look. Mostly a UI bounty on top of logic that is already correct.
 
-### `sbom-diff` — what changed between two builds · **S**
+### ~~`sbom-diff`~~ — what changed between two builds · **S** · **DONE**
+Delivered as `bare sbom-diff A B`, where each side is a run id or an SBOM file.
+Components match on purl identity without the version, so an upgrade is one
+change rather than a removal and an addition; licence changes are reported too,
+and a diff against an incomplete inventory says so.
+
 SBOM export is deterministic by design: no clock, no random serial, so two
 exports of a run are byte-identical specifically so they can be diffed. Nothing
 does the diffing. `bare sbom-diff RUN_A RUN_B` reporting added, removed, and
