@@ -76,8 +76,12 @@ A tool that finds secrets is itself a concentrated store of secrets. Therefore:
 
 - Discovered values are stored **hashed and masked** by default. Reports show
   masked values.
-- Plaintext retention is opt-in per run, encrypted at rest, with a TTL and an
-  auto-purge job.
+- Plaintext retention is opt-in per run. Retained values are encrypted at rest
+  with AES-256-GCM, each bound to its run and value hash, under a key kept
+  outside the database (`BARE_RETENTION_KEY` or a generated key file). They are
+  served only until the run's retention deadline (`BARE_PLAINTEXT_TTL_HOURS`,
+  a week by default), which is checked on every read, and then deleted by a
+  scheduled purge that records the count in the audit log.
 - Plaintext export requires separate authorization and is itself an audited
   event.
 - RBAC: `admin` / `analyst` / `viewer`, with `viewer` unable to reveal

@@ -35,6 +35,7 @@ __all__ = [
     "discover_rules_task",
     "explain_finding_task",
     "investigate_finding_task",
+    "purge_expired_plaintext",
     "reap_containers",
     "recover_orphaned_runs",
     "sandbox_smoke_test",
@@ -131,6 +132,26 @@ def recover_orphaned_runs() -> dict[str, Any]:
 
     if report["requeued"] or report["failed"]:
         log.info("recovery.sweep", **report)
+    return report
+
+
+@celery_app.task(name="bare.purge_expired_plaintext", queue=QUEUE_CONTROL)
+def purge_expired_plaintext() -> dict[str, Any]:
+    """Periodic deletion of retained secret values whose retention has ended."""
+    from core.db import session_scope
+    from core.retention import purge_expired_plaintext as purge
+
+    try:
+        with session_scope() as session:
+            report = purge(session).to_dict()
+    except Exception as exc:
+        # A failing purge must not crash beat. The deadline is still enforced
+        # on every read, so a missed pass delays deletion, not exposure.
+        log.warning("retention.purge_failed", error=str(exc))
+        return {"runs": [], "values": 0, "error": str(exc)}
+
+    if report["runs"]:
+        log.info("retention.purged", **report)
     return report
 
 

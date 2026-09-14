@@ -795,3 +795,80 @@ two unhealthy providers nobody asked for. Inert beats plausible-but-wrong.
 **Cache the probe results.** The page's own text says a stale green tick is
 worse than none, and that is right: "test connection" is the question being
 asked. Making the probe fast is the fix; making it rare is an evasion.
+
+---
+
+## ADR-0032 — Retained plaintext is sealed with a key outside the database, and its deadline is enforced on read
+
+**Date:** 2026-09-14
+**Status:** Accepted
+
+(ADR-0031 is referenced by the in-progress Ghidra image and is left for it.)
+
+### Context
+
+A run can opt into retaining the real value behind each finding, so someone can
+rotate the credential. §9 attaches three conditions: encrypted at rest, a TTL,
+and auto-purge. None existed. `evidence.value_plaintext` held the value as text,
+indefinitely, and the scan form told the operator so. The form was also out of
+date: the findings API had since begun returning those values, so they were not
+only stored but served.
+
+### Decision
+
+**AES-256-GCM, per value, via `cryptography`.** Each value gets a random nonce,
+and the associated data is `run_id ␟ value_hash`, so a ciphertext copied onto
+another row fails authentication instead of revealing under the wrong finding.
+The stored form is `bare:v1:<key id>:<base64>`. The key id is a short hash of the
+key, so a value sealed under a rotated-away key can be diagnosed.
+
+**The key is never in Postgres.** It is `BARE_RETENTION_KEY` if set; otherwise
+`<data_dir>/retention.key`, created on first use by writing a private temporary
+file and hard-linking it into place. The API and both worker lanes already share
+that volume, so whichever process creates the key, the others read the same one.
+An unusable configured key is an error, not a prompt to generate a new one: a
+replacement key silently makes everything already stored unreadable.
+
+**The deadline is enforced on read.** `runs.plaintext_expires_at` is set at
+ingest, from upload time. `plaintext_available()` is the one check used by
+sealing at scan time, the reveal path, and the investigation tools' plaintext
+opt-in. A late or stopped purge therefore delays deletion but never extends
+exposure.
+
+**A beat task purges.** It nulls expired values, stamps `plaintext_purged_at`,
+and writes a `plaintext_purged` audit record with the count.
+
+**Legacy rows fail closed.** Values without the `bare:v1:` prefix are never
+served. Migration 0005 expires every run that retained plaintext before this
+change, so the first purge deletes the unencrypted values.
+
+### Consequences
+
+- A leaked database backup, replica, or dump no longer carries readable secrets.
+- A compromised API or worker host still does, because it holds the key. This
+  protects data at rest, not a live host.
+- Upgrading deletes values retained before the change. Anyone who needs one
+  must re-scan, and the new copy is encrypted.
+- Changing the key makes retained values unreadable until they expire and are
+  purged. There is no re-encryption tool; that would matter only if the TTL
+  became much longer than a week.
+- The column is still named `value_plaintext` though it now holds ciphertext.
+  Renaming it would cost a migration for no change in behaviour; the model
+  docstring says what it holds.
+
+### Alternatives rejected
+
+**Postgres `pgcrypto`.** Encryption would happen in SQL, so the key would travel
+to the database with every query and appear in its statement logs. That is the
+one place it must not be.
+
+**Deriving the key from the API token or the MinIO secret.** Rotating either
+would silently make retained values unreadable, and it ties two unrelated
+secrets together.
+
+**Enforcing the TTL only in the purge job.** The purge job would become the
+control. A stopped beat, which has no healthcheck (§6), would then quietly mean
+secrets are served for ever.
+
+**Fernet.** Also from `cryptography`, but it has no associated data, so a value
+could not be bound to its row without inventing a framing scheme on top.

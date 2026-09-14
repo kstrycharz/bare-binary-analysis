@@ -140,6 +140,9 @@ class AuditAction(StrEnum):
     ARTIFACT_UPLOADED = "artifact_uploaded"
     ATTESTATION_RECORDED = "attestation_recorded"
     PLAINTEXT_REVEALED = "plaintext_revealed"
+    PLAINTEXT_PURGED = "plaintext_purged"
+    """A run's retained secret values deleted because its retention ended.
+    Carries the count, so the deletion is provable rather than assumed."""
     FINDING_STATUS_CHANGED = "finding_status_changed"
     SUPPRESSION_CREATED = "suppression_created"
     LLM_CALL = "llm_call"

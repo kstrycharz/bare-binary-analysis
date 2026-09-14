@@ -89,7 +89,10 @@ containers — but it is bounded:
 **Sensitive data at rest.** Secrets are hashed and masked by default, but the
 findings database is still a high-value target. Encrypt the volume, restrict
 network access to Postgres, and keep plaintext retention off unless a specific
-run needs it.
+run needs it. When a run does retain values they are AES-GCM ciphertext under a
+key held outside the database, served only until the run's deadline, and then
+purged (ADR-0032) — which protects a leaked backup or replica, not a compromised
+API host, since that host holds the key.
 
 **Denial of service by an authorized user.** Rate limiting and per-tenant quotas
 are not implemented. The reference deployment assumes an internal, authenticated

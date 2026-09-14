@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from core.config import get_settings
 from core.models import Artifact, AuditLog, Run
 from core.models.enums import AuditAction, RunStatus
+from core.retention import retention_deadline
 from core.storage import get_object_store
 
 log = structlog.get_logger(__name__)
@@ -90,6 +91,9 @@ def ingest_artifact(
         attested_at=now,
         llm_enabled=llm_enabled,
         retain_plaintext=retain_plaintext,
+        # From the moment of upload, not scan completion: a run that sat queued
+        # for a day has not earned an extra day of holding secrets.
+        plaintext_expires_at=retention_deadline(now, settings) if retain_plaintext else None,
     )
     session.add(run)
     session.flush()

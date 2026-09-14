@@ -360,7 +360,11 @@ is where waivers acquire missing owners and absent expiries. Wanted:
 `bare waive <id> --reason ... --expires ...` appending a well-formed entry.
 Should refuse to write a waiver with no expiry.
 
-### `retention-ttl` — make the plaintext promise true · **M**
+### ~~`retention-ttl`~~ — make the plaintext promise true · **M** · **DONE**
+Delivered per ADR-0032: AES-256-GCM bound to each row, a key outside Postgres,
+a per-run deadline enforced on every read, and an audited scheduled purge.
+Still open and recorded in `CLAUDE.md` §6: reveals are not yet audited.
+
 `CLAUDE.md` §9 promises that retained plaintext is encrypted at rest, has a TTL,
 and is auto-purged. None of the three exists. A run scanned with retention
 enabled leaves real secrets in Postgres indefinitely. The UI says so at the point

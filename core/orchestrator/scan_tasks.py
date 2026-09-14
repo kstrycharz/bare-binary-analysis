@@ -335,14 +335,14 @@ def investigate_finding_task(run_id: str, finding_id: str) -> dict[str, Any]:
 
         run = session.get(Run, run_id)
 
+        from core.retention import plaintext_available
+
         # §9: plaintext may reach a *local* provider only, and only when the
-        # run opted into retaining it and redaction is not strict. Any one of
-        # those being false means the tools mask what they return.
+        # run opted into retaining it, its retention has not ended, and
+        # redaction is not strict. Any one of those being false means the tools
+        # mask what they return.
         allow_plaintext = bool(
-            provider.is_local
-            and run is not None
-            and run.retain_plaintext
-            and config.redaction != "strict"
+            provider.is_local and plaintext_available(run) and config.redaction != "strict"
         )
 
         locations = list(

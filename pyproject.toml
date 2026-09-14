@@ -29,6 +29,9 @@ dependencies = [
     "click==8.1.8",
     "pyyaml==6.0.2",
     "litellm==1.61.20",
+    # AES-GCM for retained plaintext at rest (ADR-0032). The standard library
+    # has no authenticated cipher, and pyca is the one everything else uses.
+    "cryptography==50.0.1",
 ]
 
 [project.optional-dependencies]

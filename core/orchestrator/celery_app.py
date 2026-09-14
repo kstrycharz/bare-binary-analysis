@@ -68,6 +68,14 @@ def create_celery() -> Celery:
                 "schedule": float(settings.orphan_sweep_interval_seconds),
                 "options": {"queue": QUEUE_CONTROL, "expires": 120},
             },
+            # Deletes retained secret values once a run's retention ends. The
+            # deadline is enforced on read regardless; this is what stops the
+            # database holding ciphertext nobody may open.
+            "purge-expired-plaintext": {
+                "task": "bare.purge_expired_plaintext",
+                "schedule": float(settings.plaintext_purge_interval_seconds),
+                "options": {"queue": QUEUE_CONTROL, "expires": 120},
+            },
         },
     )
     # Lazy on purpose: `force=True` imports core.orchestrator.tasks while this

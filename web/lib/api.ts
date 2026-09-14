@@ -40,6 +40,10 @@ export interface RunSummary {
   attested_by: string;
   attestation_reference: string;
   llm_enabled: boolean;
+  retain_plaintext: boolean;
+  /** When this run stops serving retained secret values; null if it kept none. */
+  plaintext_expires_at: string | null;
+  plaintext_purged_at: string | null;
   artifact_name: string | null;
   artifact_sha256: string | null;
   artifact_size_bytes: number | null;

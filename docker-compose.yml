@@ -52,6 +52,11 @@ x-backend-env: &backend-env
   # Memory ceiling per analyzer container. A 213 MB installer unpacks to
   # ~69 000 files, which is the shape that pushes against this.
   BARE_ANALYZER_MEMORY_GB: ${BARE_ANALYZER_MEMORY_GB:-8}
+  # Retained plaintext (a per-run opt-in) is encrypted at rest and purged after
+  # this many hours. Empty key = generated into backend-data, which the API and
+  # both workers share; set one to keep it in your own secret store (ADR-0032).
+  BARE_PLAINTEXT_TTL_HOURS: ${BARE_PLAINTEXT_TTL_HOURS:-168}
+  BARE_RETENTION_KEY: ${BARE_RETENTION_KEY:-}
 
 services:
   postgres:

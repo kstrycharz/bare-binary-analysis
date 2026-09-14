@@ -142,6 +142,7 @@ Append-only; supersede rather than edit.
 - **ADR-0028** — Analyzer images are Compose services, built by `docker compose up` (2026-08-27)
 - **ADR-0029** — The API is the only migrator, and everything else waits for it (2026-08-27)
 - **ADR-0030** — The packaged LLM config ships inert (2026-08-27)
+- **ADR-0032** — Retained plaintext is sealed with a key outside the database, and its deadline is enforced on read (2026-09-14)
 
 ---
 
@@ -167,10 +168,11 @@ mostly about the tool being *lived with* rather than demonstrated.
    `bare waive <id> --reason ... --expires ...` to append a well-formed
    entry. Hand-editing YAML under time pressure is where waivers acquire
    missing owners and absent expiries.
-3. **Plaintext retention needs its TTL.** §9 promises encryption at rest, a
-   TTL, and auto-purge. None of the three exists, so a run scanned with
-   retention on leaves real secrets in Postgres indefinitely. The UI says so at
-   the point of choosing, which is not the same as the promise being kept.
+3. **Audit plaintext reveals.** Retention is now encrypted, deadlined, and
+   purged (ADR-0032), but the findings API returns retained values inside
+   ordinary list and detail responses with no `plaintext_revealed` record.
+   SECURITY.md promises that reveals are audited; they should move behind
+   their own endpoint that writes one.
 4. **The Go string-blob problem** (§6). It affects every rule on every Go
    binary and needs a Go-aware splitter, not a per-rule patch.
 5. **Decide about `remediate`.** It is routable and described in the settings
@@ -200,7 +202,8 @@ computation the gate already does, surfaced for a human rather than a pipeline.
 | Medium | The release gate has no native GitHub Action or GitLab component; `docs/CICD.md` calls the CLI directly, which works everywhere but is more wiring than a marketplace action. |
 | Medium | `first_seen_run_id` on `Finding` is never populated. The gate computes "is new" from the baseline run's id set instead, which is correct but means the column is dead weight. |
 | Low | `click` is pinned to 8.1.8 to work around typer 0.15.1 (ADR-0020). Revisit when typer supports click 8.2+. |
-| Medium | Plaintext retention has no TTL and no auto-purge, and nothing encrypts it at rest. A run scanned with "Retain full plaintext values" leaves real secrets in Postgres indefinitely. The UI says so at the point of choosing, but §9 promises a TTL that does not exist yet. |
+| Medium | Retained plaintext is returned inside every findings list and detail response for a run that kept it, and no `plaintext_revealed` audit record is written. It is encrypted at rest, deadlined, and purged (ADR-0032), but SECURITY.md promises audited reveals and a separate authorization, and neither exists. |
+| Low | There is no re-encryption path for retained values when `BARE_RETENTION_KEY` changes; they become unreadable until they expire and are purged. Acceptable at a one-week TTL. |
 | Medium | Investigation quality tracks the model hard. On a local 14b the loop runs correctly — it searches, probes encodings, and terminates — but the conclusion is often generic ("review the file and ensure it does not contain sensitive information"). The mechanism is sound; the prose needs a better model or a larger `num_ctx`, and the default routing sends `investigate` to the fast model. |
 | Low | An investigation re-reads no earlier tool output once it falls outside `MAX_CONTEXT_TURNS`; the model is told steps were omitted but cannot get them back. Fine at 12 steps, wrong if the cap ever rises much. |
 | Medium | The `remediate` role is routable and described in the settings UI as not-yet-wired, but nothing calls it. Either wire it or drop it from `EDITABLE_ROLES`. |
