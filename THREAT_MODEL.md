@@ -41,12 +41,12 @@ container's configuration is not evidence that the configuration took effect.
 | Artifact tampers with the input it is judged on | `/input` mounted read-only | ✅ write fails |
 | Artifact escalates to root inside the container | `user=10001:10001`, `cap_drop=ALL`, `no-new-privileges` | ✅ uid is 10001 |
 | Artifact escapes via kernel or namespace primitives | Seccomp allowlist denies `ptrace`, `mount`, `unshare`, `setns`, `bpf`, `perf_event_open`, `userfaultfd`, `io_uring`, the module and keyring families | ✅ `unshare(CLONE_NEWUSER)` and `ptrace` both EPERM from inside |
-| Artifact takes the host down by exhausting memory | `mem_limit` with `memswap_limit` equal, so it OOMs rather than swapping | ✅ memory hog is stopped, reported as OOM |
+| Artifact takes the host down by exhausting memory | `mem_limit` with `memswap_limit` equal, so it OOMs rather than swapping | ⚠️ the memory hog is stopped, but is intermittently reported as completed rather than OOM (exit 137 without `OOMKilled`) — see Known gaps |
 | Artifact hangs the pipeline | Watchdog: SIGTERM → grace → SIGKILL; run continues with the analyzer marked | ✅ SIGTERM-ignoring container is killed |
 | Artifact fork-bombs | `pids_limit=512`, `nproc` ulimit | ⚠️ configured, not yet asserted |
 | Artifact reaches the Docker socket and escapes to the host | Socket is never mounted into analyzers; the spec validator rejects any attempt | ✅ spec validation test |
 | Artifact reads another run's data | Mounts confined to the run root; one staging and one results directory per run | ✅ mount confinement test |
-| Zip bomb exhausts disk | Depth cap, cumulative byte cap, file-count cap across the whole extraction tree | ❌ **not implemented** — arrives with S2 in M2 |
+| Zip bomb exhausts disk | Depth cap (8), file-count cap (20,000 by default), and a cumulative byte cap scaled to input size, across the whole extraction tree (`core/unpack/budget.py`) | ✅ unit tests: depth cap, a zip bomb stopped by its own header, budget scaling and its absolute ceiling |
 | Crashed orchestrator leaks containers | Reaper sweep on run liveness and age | ✅ unit tests; live sweep verified |
 
 ## What it does not defend against — and why
@@ -89,7 +89,8 @@ containers — but it is bounded:
 **Sensitive data at rest.** Secrets are hashed and masked by default, but the
 findings database is still a high-value target. Encrypt the volume, restrict
 network access to Postgres, and keep plaintext retention off unless a specific
-run needs it.
+run needs it. Retained values are currently stored unencrypted with no expiry;
+encryption at rest, a deadline, and a purge are in review (#12).
 
 **Denial of service by an authorized user.** Rate limiting and per-tenant quotas
 are not implemented. The reference deployment assumes an internal, authenticated
@@ -115,32 +116,42 @@ netns is a containment measure, not a guarantee.
 The question a security team will actually ask is *"what leaves my network?"*
 The answer must be precise, so it is enforced in code rather than by convention:
 
-- Egress policy is enforced at the HTTP-client layer. A request to a
-  non-allowlisted host raises. Air-gapped mode makes cloud adapters fail at
-  config-validation time, not at request time.
+- Egress is enforced in code (`EgressPolicyGuard`, ADR-0027). Loopback and
+  private addresses count as local. Under `BARE_EGRESS_POLICY=deny` any other
+  destination raises — including calls whose host LiteLLM resolves internally —
+  and air-gapped mode forbids every non-local provider.
 - Candidate secret plaintext is never sent to a remote provider — shape,
   entropy, rule name, masked context, and offsets only. Local providers may
-  receive plaintext solely under a distinct, explicit opt-in.
-- Identified customer data (emails, names, IPs) is redacted from context windows
-  before remote calls.
-- Every outbound call is logged with provider, model, role, token counts, prompt
-  hash, and redaction level, as a replayable record.
-- `--llm-dry-run` renders every prompt to disk without sending, so the boundary
-  can be audited before the tool is approved.
-- The MCP servers enforce the same run-scoped authorization and redaction as the
-  internal pipeline. An MCP client must not be a way around the boundary.
+  receive plaintext solely under a distinct, explicit opt-in. **Known gap:**
+  until #14 lands, a context snippet masks only its own value, so a neighbouring
+  secret can reach the model.
+- There is no redaction of customer data (emails, names, IPs) beyond secret
+  masking. Residue sent to the rule-discovery role is truncated, not redacted.
+- Every outbound call is recorded in `llm_calls`: provider, model, role,
+  locality, redaction level, prompt hash, the exact rendered prompt, the
+  response, token counts, and duration. "What exactly did you send?" has a
+  precise answer — which also makes that table sensitive.
+- There is no dry-run mode that renders prompts without sending them; the
+  recorded prompts are the audit trail.
+- MCP servers are not built (M5). When they are, they must enforce the same
+  run-scoped authorization and redaction as the internal pipeline, so an MCP
+  client is never a way around the boundary.
 
-Status: designed, scheduled for M3. Until then the pipeline is
-deterministic-only and makes no outbound calls at all.
+Status: implemented in M3, except customer-data redaction, a dry-run mode, and
+the MCP servers.
 
 ## Known gaps
 
 | Gap | Severity | Plan |
 | --- | --- | --- |
-| Zip-bomb and recursion budgets not implemented | High once S2 exists | M2, with S2 unpacking |
 | Seccomp profile only exercised against a slim Python image | Medium | Validate per analyzer image as Ghidra and Wine land |
 | Fork-bomb containment configured but not asserted | Low | Add a probe that spawns past `pids_limit` |
 | No rootless runtime | Medium | Podman driver, M6 |
 | No RBAC or SSO | Medium | M6 |
 | No rate limiting or quotas | Low | Post-M6 |
-| Reaper cannot see run liveness until the `runs` table exists | Low | M1; degrades safely to age-based cleanup |
+| Reaper cannot see run liveness: `_active_run_ids()` still returns `None` | Low | Wire it to the `runs` table; degrades safely to age-based cleanup until then |
+| Context snippets carry neighbouring secrets in the clear, and reach the model as "masked context" | High | Fix in review: #14 |
+| A container killed with exit 137 but no `OOMKilled` flag is reported as completed, so an unfinished scan can pass the gate | High | Treat an unexplained SIGKILL as a failed stage |
+| Retained plaintext is unencrypted and never expires | Medium | In review: #12 |
+| Plaintext reveals, settings changes, exports, and suppressions are not audited | Medium | `audit-completeness` bounty |
+| No customer-data redaction and no prompt dry-run before remote model calls | Medium | Unscheduled; `llm_calls` records what was sent in the meantime |
