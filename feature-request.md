@@ -354,7 +354,12 @@ scheduler is currently only visible in logs. Probably a heartbeat file plus a
 check that reads its mtime. **Good first bounty** — self-contained, and there is
 a worked example to copy in `core/orchestrator/health.py`.
 
-### `waive` — `bare waive <id>` · **S**
+### ~~`waive`~~ — `bare waive <id>` · **S** · **DONE**
+Delivered as `bare waive`. Building it turned up the real bug: the gate's text
+output printed a 12-character id prefix, and waivers match the full id exactly,
+so a waiver copied from a red build never applied. The output now prints the
+full id, and `bare waive` refuses a prefix and says why.
+
 CI prints finding ids; turning one into a waiver means hand-editing YAML, which
 is where waivers acquire missing owners and absent expiries. Wanted:
 `bare waive <id> --reason ... --expires ...` appending a well-formed entry.
