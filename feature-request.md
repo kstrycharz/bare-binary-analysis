@@ -415,6 +415,31 @@ scan duration by profile, analyzer failure rate by image, and stage degradation
 counts are all already computed and thrown away. Must not leak finding content
 into labels.
 
+### `readme-screenshots` — show the product in the README · **S**
+The README is ~280 lines of prose and not one image. Someone deciding whether to
+run `docker compose up` cannot see what they would get: the run list, the upload
+form with its attestation, a run page with findings and the artifact tree, an
+explanation or investigation transcript, the setup wizard, and — for the CI
+audience — what `bare scan` prints when it blocks a build.
+
+Wanted: screenshots of those views in `docs/images/`, placed in the README where
+the prose already describes them, each with real alt text.
+
+**Watch out for:**
+- **§9 applies to pictures too.** Every screenshot comes from scanning a synthetic
+  fixture built from provably-invalid shapes (`AKIAIOSFODNN7EXAMPLE`), with no
+  real hostnames, usernames, or tokens in view — and nothing with plaintext
+  retention switched on. gitleaks does not read PNGs, so review is the only check.
+- **No model output presented as a finding.** An AI panel in a screenshot is
+  labelled as advisory, the same way it is in the product.
+- **They will rot.** Prefer a small script (Playwright against the Compose stack
+  and a seeded run) that regenerates them, over hand-captured images nobody
+  updates after the next UI change.
+- Size. Compress them; a README that pulls 20 MB of PNGs is its own problem.
+
+**Done when:** a first-time reader can see the dashboard and a blocked CI run
+without installing anything, and the images can be regenerated with one command.
+
 ### `dogfood` — scan BARE's own releases · **S**
 The README claims BARE is a build-pipeline stage gate. Nothing currently verifies
 that claim. Wiring the gate into this repo's own CI on release tags is the
