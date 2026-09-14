@@ -12,6 +12,7 @@ from celery import Celery
 from kombu import Queue
 
 from core.config import get_settings
+from core.orchestrator.beat_scheduler import BEAT_MAX_LOOP_INTERVAL_S
 
 # Queue names are referenced by the worker command lines in docker-compose;
 # keep them in one place so the two cannot drift.
@@ -53,6 +54,13 @@ def create_celery() -> Celery:
         task_queues=tuple(Queue(name) for name in ALL_QUEUES),
         task_default_queue=QUEUE_CONTROL,
         result_expires=60 * 60 * 24 * 7,
+        # The scheduler class carries the heartbeat (bounty: beat-healthcheck,
+        # ADR-0033), and this bound is what makes the heartbeat meaningful
+        # when idle: measured on the real image, the default tick sleeps up to
+        # 300s between sweeps, so "file untouched for 2 minutes" would prove
+        # nothing. 30s makes the absence of a tick the only signal instead.
+        beat_scheduler="core.orchestrator.beat_scheduler.HeartbeatScheduler",
+        beat_max_loop_interval=BEAT_MAX_LOOP_INTERVAL_S,
         beat_schedule={
             "reap-orphaned-containers": {
                 "task": "bare.reap_containers",

@@ -46,7 +46,7 @@ containers.
 | `api` | service | built, `deploy/Dockerfile.backend` | unless-stopped | `GET /healthz` | root in container, **no Docker socket** |
 | `worker` | service | built, same image as `api` | unless-stopped | Celery ping to its own node | **Docker socket — root-equivalent on the host** |
 | `worker-heavy` | service | built, same image as `api` | unless-stopped | Celery ping to its own node | **Docker socket — root-equivalent on the host** |
-| `beat` | service | built, same image as `api` | unless-stopped | none (see below) | root in container, no socket |
+| `beat` | service | built, same image as `api` | unless-stopped | heartbeat file age (see below) | root in container, no socket |
 | `web` | service | built, `web/Dockerfile` | unless-stopped | none | runs as uid 10002 |
 | `analyzer-hello` | build-only | builds `bare/hello:dev` | no | — | no |
 | `analyzer-static` | build-only | builds `bare/static:dev` | no | — | no |
@@ -215,11 +215,15 @@ The Celery scheduler. Runs two periodic tasks:
   for ever.
 
 - **Waits for:** Redis and the API healthy (its reaper reads the `runs` table).
-- **Healthcheck: none.** Beat answers no `celery inspect ping`, and the slim
-  base image has no `pgrep` to approximate one with. A wedged scheduler is
-  currently visible only in its logs. That gap is recorded in `CLAUDE.md` §6 and
-  is an open bounty (`beat-healthcheck`) rather than something papered over with
-  a check that cannot fail.
+- **Healthcheck: a heartbeat file.** Beat answers no `celery inspect ping`
+  (it is not a worker node), so the scheduler itself signs for being alive:
+  `HeartbeatScheduler` touches `/app/data/beat/heartbeat` on every tick — and
+  `beat_max_loop_interval` pins the tick to 30 s, so the touch happens even
+  when nothing is due. The check (`python -m core.orchestrator.beat_health`)
+  fails when the file is older than 4 tick intervals: wedged, not merely idle.
+  It reads liveness, not correctness — a ticking beat with a dead broker
+  passes and is visible where it belongs, in queued work not arriving
+  (ADR-0033).
 - **If it dies:** scans still work. Cleanup and orphan recovery stop, so stale
   containers accumulate and a run orphaned by a restart stays stuck.
 
