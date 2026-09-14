@@ -847,6 +847,17 @@ a deployment needs more, that is a rule-pack change, made once, audited.
 analyzer's error output, under any realistic accumulation — and the document
 says `[bare: stored log truncated]` rather than cutting silently.
 
+**Redaction runs before the cap, over each whole stream.** The first version
+capped and then redacted, and a key straddling the 256 KiB line was stored as
+`key=AKIAIO` — a prefix no rule recognises, so nothing masked it. Redacting
+first costs a full-stream scan, bounded by the driver's 8 MiB collection cap
+(measured: 0.16 s at 256 KiB, 5.4 s at 8 MiB), and cutting masked text can only
+shorten a mask. The driver's own cap has the same shape and cannot be
+redacted around, since the rest of the value never reached the worker, so the
+line it cut through is dropped. The 2000-character stderr excerpt in
+`run_stages.error`, which predates this ADR and is served on every run detail
+response, gets the same redaction in the same order.
+
 **Read path:** `GET /api/runs/{id}/stages/{stage_id}/logs`, ADMIN-scoped
 (log text is masked secret-adjacent context — it sits with the findings
 corpus, not the CI surface), served as `text/plain` with

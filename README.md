@@ -123,6 +123,8 @@ run page, or exported from the CLI:
 bare scan dist/installer.exe --sbom sbom.cdx.json   # during a scan
 bare sbom RUN_ID -o sbom.cdx.json                   # any run, later
 bare sbom RUN_ID | jq '.components | length'        # stdout by default
+bare sbom-diff LAST_RELEASE_RUN THIS_BUILD_RUN      # added, removed, upgraded
+bare sbom-diff v2.4.cdx.json v2.5.cdx.json --json   # or two SBOM files
 ```
 
 Every component carries how it was identified — a `package.json` declaration
