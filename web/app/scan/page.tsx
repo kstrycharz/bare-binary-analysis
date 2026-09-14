@@ -176,11 +176,11 @@ export default function ScanPage() {
                 <span>
                   Retain full plaintext values for this run
                   <span className="mt-0.5 block text-xs text-content-muted">
-                    Writes the actual secret value into the database,
-                    unencrypted, with no expiry and no page in this dashboard
-                    that reads it back — retrieving it means a direct SQL
-                    query against the evidence table. Turn this on only if you
-                    already have a process for that.
+                    Stores the actual secret values, encrypted at rest, so
+                    anyone who can open this run&apos;s findings can reveal
+                    them. They are deleted automatically when the retention
+                    period ends — a week by default. Turn this on only when
+                    you need the values to rotate the credentials.
                   </span>
                 </span>
               </label>

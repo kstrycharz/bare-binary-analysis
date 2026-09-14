@@ -12,7 +12,7 @@ from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from core import __version__
@@ -133,6 +133,24 @@ class Settings(BaseSettings):
     air_gapped: bool = False
     dynamic_analysis_enabled: bool = False
     retain_plaintext_secrets: bool = False
+
+    plaintext_ttl_hours: int = Field(default=168, ge=1)
+    """How long a run that opted into plaintext retention may serve the values.
+
+    Enforced when values are read, and then deleted by the purge task. A week:
+    long enough to rotate what a scan found, short enough that the database is
+    not quietly becoming a credential store."""
+
+    plaintext_purge_interval_seconds: int = Field(default=900, ge=60)
+
+    retention_key: str = ""
+    """Base64 AES-256 key that encrypts retained values at rest.
+
+    Empty means `<data_dir>/retention.key`, generated on first use on the volume
+    the API and workers share. Set it explicitly to keep the key in a secret
+    store instead. Either way it is never in Postgres, so a database backup on
+    its own does not carry readable secrets (ADR-0032). Changing it makes every
+    value already retained unreadable; they expire and are purged as usual."""
 
     require_attestation: bool = False
     """Whether uploads must carry an authorization attestation (§14).

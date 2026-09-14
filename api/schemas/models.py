@@ -47,6 +47,10 @@ class RunSummary(BaseModel):
     attestation_reference: str
 
     llm_enabled: bool = False
+    retain_plaintext: bool = False
+    plaintext_expires_at: datetime | None = None
+    """When this run stops serving retained secret values. Null if it kept none."""
+    plaintext_purged_at: datetime | None = None
     artifact_name: str | None = None
     artifact_sha256: str | None = None
     artifact_size_bytes: int | None = None

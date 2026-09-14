@@ -744,8 +744,8 @@ function SecretValue({ finding }: { finding: Finding }) {
 
       <p className="mt-1 text-xs text-content-subtle">
         {has
-          ? "This run retained plaintext, so the real values are stored in the database and shown here on request."
-          : "Only a masked value and a hash were stored. To see the real value, re-scan this artifact with “Retain full plaintext values” selected."}
+          ? "This run retained plaintext. The values are encrypted at rest and deleted automatically when the run's retention period ends."
+          : "No plaintext is available: either only a masked value and a hash were stored, or this run's retention period has ended and the values were deleted. To see the real value, re-scan with “Retain full plaintext values” selected."}
       </p>
     </div>
   );

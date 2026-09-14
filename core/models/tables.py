@@ -78,6 +78,13 @@ class Run(Base, TimestampMixin):
     retain_plaintext: Mapped[bool] = mapped_column(Boolean, default=False)
     dynamic_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    plaintext_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """When a retaining run must stop serving its values. Set at ingest and
+    enforced on every read (core/retention.py), so the purge task is cleanup,
+    not the control."""
+    plaintext_purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """When the purge task deleted the values. Audited with the count."""
+
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error: Mapped[str | None] = mapped_column(Text)
@@ -265,8 +272,10 @@ class Evidence(Base, TimestampMixin):
     value_hash: Mapped[str] = mapped_column(String(64), index=True)
     value_masked: Mapped[str] = mapped_column(Text)
     value_plaintext: Mapped[str | None] = mapped_column(Text)
-    """Populated only when the run opted into plaintext retention. Subject to
-    TTL and the auto-purge job."""
+    """Populated only when the run opted into plaintext retention, and then as
+    AES-GCM ciphertext bound to this run and value hash — never the value itself,
+    despite the column's name. Read through core.retention.decrypt_value, and
+    nulled by the purge task when the run's retention ends."""
 
     offset: Mapped[int | None] = mapped_column(BigInteger)
     section: Mapped[str | None] = mapped_column(String(128))

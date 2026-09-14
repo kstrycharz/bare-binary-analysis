@@ -14,8 +14,10 @@ locations, not hashes.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from sqlalchemy import create_engine
@@ -25,6 +27,7 @@ from api.routers.findings import _plaintexts
 from core.models import Artifact, Evidence, Finding, FindingLocation, Run
 from core.models.base import Base
 from core.models.enums import ArtifactKind, RunStatus
+from core.retention import encrypt_value
 from core.vocab import Severity
 
 REAL = [
@@ -32,6 +35,13 @@ REAL = [
     r"Z:\repo\ares\Crux\Code\Eugen\CPP\EugSound\SoundEngine.cpp",
     r"Z:\repo\ares\WarGame\Bin\WarGame.Final.x64.pdb",
 ]
+
+KEY = os.urandom(32)
+
+
+@pytest.fixture(autouse=True)
+def _retention_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("api.routers.findings.retention_key", lambda: KEY)
 
 
 @pytest.fixture
@@ -42,16 +52,19 @@ def session() -> Iterator[Session]:
         yield active
 
 
-def _run(session: Session) -> Run:
-    run = Run(
-        id="r1",
-        status=RunStatus.COMPLETED,
-        profile="standard",
-        attested_by="kyle",
-        attestation_reference="SEC-1",
-        attested_at=datetime.now(UTC),
-        retain_plaintext=True,
-    )
+def _run(session: Session, **overrides: Any) -> Run:
+    fields: dict[str, Any] = {
+        "id": "r1",
+        "status": RunStatus.COMPLETED,
+        "profile": "standard",
+        "attested_by": "kyle",
+        "attestation_reference": "SEC-1",
+        "attested_at": datetime.now(UTC),
+        "retain_plaintext": True,
+        "plaintext_expires_at": datetime.now(UTC) + timedelta(days=1),
+    }
+    fields.update(overrides)
+    run = Run(**fields)
     session.add(run)
     session.add(
         Artifact(
@@ -69,16 +82,20 @@ def _run(session: Session) -> Run:
     return run
 
 
-def _evidence(session: Session, offset: int, plaintext: str | None) -> None:
+def _evidence(session: Session, offset: int, plaintext: str | None, *, sealed: bool = True) -> None:
+    value_hash = f"{offset:064d}"
+    stored = plaintext
+    if plaintext is not None and sealed:
+        stored = encrypt_value(plaintext, run_id="r1", value_hash=value_hash, key=KEY)
     session.add(
         Evidence(
             run_id="r1",
             artifact_id="a1",
             analyzer="static",
             rule_id="windows-source-file-path",
-            value_hash=f"{offset:064d}",
+            value_hash=value_hash,
             value_masked="Z:\\r" + "\u2022" * 12 + ".cpp",
-            value_plaintext=plaintext,
+            value_plaintext=stored,
             offset=offset,
         )
     )
@@ -171,3 +188,41 @@ class TestRunsWithoutRetention:
         finding = _finding(session, value_hash="h", offsets=[])
 
         assert _plaintexts(session, finding, []) == []
+
+
+class TestRetentionIsEnforcedOnRead:
+    """The deadline holds at the point of reading, so a purge job that is late
+    or not running cannot extend how long a secret is served."""
+
+    def test_nothing_is_served_after_the_deadline_even_before_the_purge(
+        self, session: Session
+    ) -> None:
+        _run(session, plaintext_expires_at=datetime.now(UTC) - timedelta(seconds=1))
+        _evidence(session, offset=100, plaintext=REAL[0])
+        finding = _finding(session, value_hash="h", offsets=[100])
+
+        assert _plaintexts(session, finding, list(finding.locations)) == []
+
+    def test_nothing_is_served_once_purged(self, session: Session) -> None:
+        _run(session, plaintext_purged_at=datetime.now(UTC))
+        _evidence(session, offset=100, plaintext=REAL[0])
+        finding = _finding(session, value_hash="h", offsets=[100])
+
+        assert _plaintexts(session, finding, list(finding.locations)) == []
+
+    def test_a_legacy_unencrypted_value_is_never_served(self, session: Session) -> None:
+        _run(session)
+        _evidence(session, offset=100, plaintext=REAL[0], sealed=False)
+        finding = _finding(session, value_hash="h", offsets=[100])
+
+        assert _plaintexts(session, finding, list(finding.locations)) == []
+
+    def test_values_sealed_under_another_key_are_not_served(
+        self, session: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _run(session)
+        _evidence(session, offset=100, plaintext=REAL[0])
+        finding = _finding(session, value_hash="h", offsets=[100])
+        monkeypatch.setattr("api.routers.findings.retention_key", lambda: os.urandom(32))
+
+        assert _plaintexts(session, finding, list(finding.locations)) == []

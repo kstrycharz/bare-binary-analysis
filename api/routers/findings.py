@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,10 +19,18 @@ from api.schemas.models import (
 )
 from core.auth import Scope
 from core.db import get_session, session_scope
-from core.models import AuditLog, Evidence, Finding, FindingLocation
+from core.models import AuditLog, Evidence, Finding, FindingLocation, Run
 from core.models.enums import AuditAction, FindingStatus
+from core.retention import (
+    RetentionKeyError,
+    decrypt_value,
+    plaintext_available,
+    retention_key,
+)
 from core.storage import get_object_store
 from core.vocab import Severity
+
+log = structlog.get_logger(__name__)
 
 # The findings corpus is a company's exposed secrets in one document, and
 # artifact bytes are the artifact itself. A CI token may submit and receive a
@@ -174,7 +183,14 @@ def _plaintexts(session: Session, finding: Finding, locations: list[FindingLocat
     with the most values to show. Locations are the real link: the correlator
     keeps every member's ``(artifact_id, offset)`` when it builds a cluster.
     """
-    if not locations:
+    if not locations or not plaintext_available(session.get(Run, finding.run_id)):
+        return []
+    try:
+        key = retention_key()
+    except RetentionKeyError as exc:
+        # Fail closed and loudly: the findings page still renders, masked, and
+        # the operator gets a log line naming the broken key.
+        log.error("retention.key_unusable", error=str(exc))
         return []
 
     keys = {(location.artifact_id, location.offset) for location in locations}
@@ -192,9 +208,11 @@ def _plaintexts(session: Session, finding: Finding, locations: list[FindingLocat
     seen: set[str] = set()
     values: list[str] = []
     for row in rows:
-        if (row.artifact_id, row.offset) not in keys:
+        if (row.artifact_id, row.offset) not in keys or row.value_plaintext is None:
             continue
-        value = row.value_plaintext
+        value = decrypt_value(
+            row.value_plaintext, run_id=row.run_id, value_hash=row.value_hash, key=key
+        )
         if value is None or value in seen:
             continue
         seen.add(value)

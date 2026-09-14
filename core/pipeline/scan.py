@@ -32,6 +32,7 @@ from core.models.base import new_uuid
 from core.models.enums import RunStatus, StageStatus
 from core.pipeline.correlator import correlate
 from core.pipeline.stages import degraded_stages, describe_degraded
+from core.retention import encrypt_value, plaintext_available, retention_key
 from core.rules import load_rule_pack
 from core.sandbox import (
     BindMount,
@@ -504,6 +505,10 @@ def _to_evidence(
     root: Artifact,
 ) -> list[Evidence]:
     rows: list[Evidence] = []
+    # The one place retained values enter the database, so the one place they
+    # are sealed. A run whose retention already lapsed while it sat queued
+    # stores nothing at all.
+    key = retention_key() if plaintext_available(run) else None
     for entry in payload.get("files", []):
         artifact_id = staged_paths.get(entry.get("relative_path", ""))
         if artifact_id is None:
@@ -519,9 +524,7 @@ def _to_evidence(
                     rule_id=match["rule_id"],
                     value_hash=match["value_hash"],
                     value_masked=match["value_masked"],
-                    value_plaintext=(
-                        match.get("value_plaintext") if run.retain_plaintext else None
-                    ),
+                    value_plaintext=_sealed(match, run, key),
                     offset=match.get("offset"),
                     encoding=match.get("encoding"),
                     entropy=match.get("entropy"),
@@ -529,6 +532,13 @@ def _to_evidence(
                 )
             )
     return rows
+
+
+def _sealed(match: dict[str, Any], run: Run, key: bytes | None) -> str | None:
+    value = match.get("value_plaintext")
+    if key is None or not isinstance(value, str):
+        return None
+    return encrypt_value(value, run_id=run.id, value_hash=match["value_hash"], key=key)
 
 
 def _apply_identification(
