@@ -235,9 +235,9 @@ class PdfWriter:
 
         pages_id = len(objects) + len(self.pages) + 1
         page_ids: list[int] = []
-        resources = "/Font << " + " ".join(
-            f"/{name} {oid} 0 R" for name, oid in font_ids.items()
-        ) + " >>"
+        resources = (
+            "/Font << " + " ".join(f"/{name} {oid} 0 R" for name, oid in font_ids.items()) + " >>"
+        )
         for content_id in content_ids:
             page_ids.append(
                 add(
@@ -458,7 +458,11 @@ def _findings(pdf: PdfWriter, data: ReportData) -> None:
         if finding.offset is not None:
             where += f" @ 0x{finding.offset:x}"
         pdf.text(
-            _clip(where, 8, CONTENT_WIDTH - 70, ),
+            _clip(
+                where,
+                8,
+                CONTENT_WIDTH - 70,
+            ),
             size=8,
             mono=True,
             colour=INK_MUTED,
@@ -500,8 +504,13 @@ def _methodology(pdf: PdfWriter, data: ReportData) -> None:
     for label, value in rows:
         pdf.need(16)
         pdf.text(label, size=8, colour=INK_MUTED)
-        pdf.text(_clip(str(value), 8.5, CONTENT_WIDTH - 150), size=8.5, mono=True, x=MARGIN + 145,
-                 leading=12)
+        pdf.text(
+            _clip(str(value), 8.5, CONTENT_WIDTH - 150),
+            size=8.5,
+            mono=True,
+            x=MARGIN + 145,
+            leading=12,
+        )
 
     pdf.space(10)
     pdf.wrap(

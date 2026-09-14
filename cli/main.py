@@ -43,12 +43,15 @@ app.add_typer(sandbox_app, name="sandbox")
 
 # The CI-facing surface. Imported eagerly because `bare scan --help` on a
 # build agent must not depend on a database or a Docker socket being reachable.
-from cli.scan_commands import gate, policy_app, sbom, scan  # noqa: E402
+from cli.scan_commands import gate, policy_app, sbom, sbom_diff, scan  # noqa: E402
 from cli.token_commands import token_app  # noqa: E402
+from cli.waive_commands import waive  # noqa: E402
 
 app.command("scan")(scan)
 app.command("gate")(gate)
+app.command("waive")(waive)
 app.command("sbom")(sbom)
+app.command("sbom-diff")(sbom_diff)
 app.add_typer(policy_app, name="policy")
 app.add_typer(token_app, name="token")
 

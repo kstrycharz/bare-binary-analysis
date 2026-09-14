@@ -81,8 +81,13 @@ services:
     <<: *logging
     restart: unless-stopped
 
+  # Pulled from quay.io, not Docker Hub: the minio/minio and minio/mc
+  # repositories are no longer anonymously pullable there (the Hub API 404s
+  # the repository, and the registry 401s the manifest), which broke
+  # `docker compose up` for every new install. quay.io carries the same
+  # pinned RELEASE tags. The registry a pin lives in is part of the pin.
   minio:
-    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-bare}
@@ -99,7 +104,7 @@ services:
 
   # One-shot: create the artifact bucket, then exit.
   minio-init:
-    image: minio/mc:RELEASE.2024-11-21T17-21-54Z
+    image: quay.io/minio/mc:RELEASE.2024-11-21T17-21-54Z
     depends_on:
       minio:
         condition: service_healthy

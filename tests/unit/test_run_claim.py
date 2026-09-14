@@ -83,9 +83,7 @@ class TestClaiming:
         _claim(run_id, first)
         assert second.get(Run, run_id).status == RunStatus.RUNNING  # type: ignore[union-attr]
 
-    def test_started_at_is_recorded_with_the_claim(
-        self, sessions: tuple[Session, Session]
-    ) -> None:
+    def test_started_at_is_recorded_with_the_claim(self, sessions: tuple[Session, Session]) -> None:
         """The orphan sweep times a running run out from this. Claiming without
         it leaves a run that can never be recovered."""
         first, _ = sessions
@@ -93,9 +91,7 @@ class TestClaiming:
         _claim(run_id, first)
         assert first.get(Run, run_id).started_at is not None  # type: ignore[union-attr]
 
-    def test_a_finished_run_cannot_be_reclaimed(
-        self, sessions: tuple[Session, Session]
-    ) -> None:
+    def test_a_finished_run_cannot_be_reclaimed(self, sessions: tuple[Session, Session]) -> None:
         """A re-delivery arriving after the scan finished must not restart it
         and overwrite a completed run's results."""
         first, _ = sessions

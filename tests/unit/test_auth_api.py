@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -44,8 +45,15 @@ ADMIN_ROUTES: list[tuple[str, str]] = [
 
 
 @pytest.fixture(autouse=True)
-def _auth_on(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+def _auth_on(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]:
     monkeypatch.setenv("BARE_AUTH_REQUIRED", "true")
+    # `GET /api/settings/llm` loads the live LLM config from `data_dir`, whose
+    # default — `/app/data` — is the container path that exists under
+    # `docker compose` and nowhere else. On a CI runner the route's
+    # seed-on-first-use mkdir dies with `PermissionError: '/app'`, which has
+    # nothing to do with scopes and everything to do with where the test
+    # process happens to be allowed to write.
+    monkeypatch.setenv("BARE_DATA_DIR", str(tmp_path))
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

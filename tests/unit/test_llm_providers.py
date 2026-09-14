@@ -42,9 +42,7 @@ def store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     yield path
 
 
-def _config(
-    egress: EgressPolicy = EgressPolicy.DENY, **spec: object
-) -> LLMConfig:
+def _config(egress: EgressPolicy = EgressPolicy.DENY, **spec: object) -> LLMConfig:
     return LLMConfig(
         enabled=True,
         providers={"p": dict(spec)},
@@ -74,9 +72,7 @@ class TestTheAirGapHolds:
     def test_a_local_endpoint_is_permitted_under_deny(self) -> None:
         """An Ollama or vLLM box on the LAN is not egress in any sense a
         security team cares about."""
-        config = _config(
-            model="hosted_vllm/x", kind="vllm", base_url="http://192.168.1.50:8000/v1"
-        )
+        config = _config(model="hosted_vllm/x", kind="vllm", base_url="http://192.168.1.50:8000/v1")
         provider = build_provider(config, "p")
         assert provider.is_local is True
 
@@ -109,9 +105,7 @@ class TestConfigLoadRefusesTheSameThing:
     """Start-up must fail on a config that would be blocked at request time,
     so an operator finds out from the logs rather than mid-scan."""
 
-    def test_a_hosted_provider_without_a_url_is_caught_at_load(
-        self, tmp_path: Path
-    ) -> None:
+    def test_a_hosted_provider_without_a_url_is_caught_at_load(self, tmp_path: Path) -> None:
         config = tmp_path / "llm.yaml"
         config.write_text(
             yaml.safe_dump({"enabled": True, "providers": {}, "roles": {}}),
@@ -233,9 +227,7 @@ class TestLocality:
     def test_no_url_and_no_declaration_defaults_to_hosted(self) -> None:
         """The safe direction: this flag gates whether plaintext could ever be
         sent, so an unknown must not read as local."""
-        provider = LiteLLMProvider(
-            model="gpt-4o-mini", guard=EgressPolicyGuard(allow_egress=True)
-        )
+        provider = LiteLLMProvider(model="gpt-4o-mini", guard=EgressPolicyGuard(allow_egress=True))
         assert provider.is_local is False
 
 

@@ -157,9 +157,7 @@ class TestOrdinaryFindings:
 
 
 class TestRunsWithoutRetention:
-    def test_nothing_is_returned_when_plaintext_was_never_stored(
-        self, session: Session
-    ) -> None:
+    def test_nothing_is_returned_when_plaintext_was_never_stored(self, session: Session) -> None:
         """The default. Masked and hashed only."""
         _run(session)
         _evidence(session, offset=100, plaintext=None)

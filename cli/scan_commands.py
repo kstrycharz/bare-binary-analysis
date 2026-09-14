@@ -22,7 +22,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Annotated, NoReturn
+from typing import Annotated, Any, NoReturn
 
 import typer
 
@@ -45,6 +45,9 @@ from core.policy import (
 # bytes for one run; a hand-rolled json.dumps here would be a third spelling
 # of a document whose whole value is being byte-stable.
 from reporting.cyclonedx import dump_sbom
+from reporting.sbom_diff import SbomDiffError, diff_sboms
+from reporting.sbom_diff import render_json as render_sbom_diff_json
+from reporting.sbom_diff import render_text as render_sbom_diff_text
 
 EXIT_ERROR = 2
 
@@ -154,21 +157,15 @@ def scan(
     ] = "",
     attestation_ref: Annotated[
         str,
-        typer.Option(
-            envvar="BARE_ATTESTATION_REF", help="Ticket, contract, or pipeline URL."
-        ),
+        typer.Option(envvar="BARE_ATTESTATION_REF", help="Ticket, contract, or pipeline URL."),
     ] = "",
     profile: Annotated[str, typer.Option(help="quick | standard | deep.")] = "standard",
     llm: Annotated[bool, typer.Option("--llm/--no-llm", help="Enable AI triage.")] = False,
     timeout: Annotated[int, typer.Option(help="Seconds to wait for the scan.")] = 1800,
     poll_interval: Annotated[float, typer.Option(help="Seconds between status polls.")] = 5.0,
     sarif: Annotated[Path | None, typer.Option(help="Write SARIF here for code scanning.")] = None,
-    pdf: Annotated[
-        Path | None, typer.Option(help="Write the PDF release record here.")
-    ] = None,
-    sbom: Annotated[
-        Path | None, typer.Option(help="Write a CycloneDX SBOM here.")
-    ] = None,
+    pdf: Annotated[Path | None, typer.Option(help="Write the PDF release record here.")] = None,
+    sbom: Annotated[Path | None, typer.Option(help="Write a CycloneDX SBOM here.")] = None,
     json_out: Annotated[
         Path | None, typer.Option("--json", help="Write the verdict as JSON.")
     ] = None,
@@ -387,21 +384,15 @@ def gate(
         str, typer.Option(help="Compare against this run id instead of the linked predecessor.")
     ] = "",
     sarif: Annotated[Path | None, typer.Option(help="Write SARIF here for code scanning.")] = None,
-    pdf: Annotated[
-        Path | None, typer.Option(help="Write the PDF release record here.")
-    ] = None,
-    sbom: Annotated[
-        Path | None, typer.Option(help="Write a CycloneDX SBOM here.")
-    ] = None,
+    pdf: Annotated[Path | None, typer.Option(help="Write the PDF release record here.")] = None,
+    sbom: Annotated[Path | None, typer.Option(help="Write a CycloneDX SBOM here.")] = None,
     json_out: Annotated[
         Path | None, typer.Option("--json", help="Write the verdict as JSON.")
     ] = None,
     markdown_out: Annotated[
         Path | None, typer.Option("--markdown", help="Write a Markdown summary here.")
     ] = None,
-    warn_only: Annotated[
-        bool, typer.Option(help="Report the verdict but always exit 0.")
-    ] = False,
+    warn_only: Annotated[bool, typer.Option(help="Report the verdict but always exit 0.")] = False,
 ) -> None:
     """Re-evaluate an existing run against a policy, without re-uploading.
 
@@ -573,3 +564,58 @@ def sbom(
     out.write_text(rendered, encoding="utf-8")
     count = len(document.get("components", []))
     typer.echo(f"wrote {out} ({count} component(s))")
+
+
+def sbom_diff(
+    before: Annotated[str, typer.Argument(help="Earlier build: a run id or an SBOM file.")],
+    after: Annotated[str, typer.Argument(help="Later build: a run id or an SBOM file.")],
+    api: Annotated[
+        str, typer.Option(envvar="BARE_API_URL", help="BARE API base URL.")
+    ] = "http://localhost:8000",
+    token: Annotated[
+        str,
+        typer.Option(envvar="BARE_TOKEN", help="Bearer token, if the deployment needs one."),
+    ] = "",
+    as_json: Annotated[bool, typer.Option("--json", help="Print the diff as JSON.")] = False,
+    exit_code: Annotated[
+        bool,
+        typer.Option("--exit-code", help="Exit 1 when the components differ, like `git diff`."),
+    ] = False,
+) -> None:
+    """Report components added, removed, and changed between two builds.
+
+    Each side is a run id, fetched from the API, or a path to an SBOM file —
+    so two SBOMs attached to releases months apart can be compared without the
+    runs that produced them. An existing file wins over a run id of the same
+    spelling.
+
+        bare sbom-diff RUN_LAST_RELEASE RUN_THIS_BUILD
+        bare sbom-diff v2.4-sbom.json v2.5-sbom.json --json
+    """
+    client: BareClient | None = None
+
+    def load(reference: str) -> tuple[dict[str, Any], str]:
+        nonlocal client
+        path = Path(reference)
+        if path.is_file():
+            try:
+                return json.loads(path.read_text(encoding="utf-8")), path.name
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                _fail(f"could not read {path} as JSON: {exc}")
+        if client is None:
+            client = BareClient(api, token=token)
+        try:
+            return client.get_sbom(reference), ""
+        except ApiError as exc:
+            _fail(f"could not fetch the SBOM for {reference!r}: {exc}")
+
+    old, old_label = load(before)
+    new, new_label = load(after)
+    try:
+        diff = diff_sboms(old, new, before_label=old_label, after_label=new_label)
+    except SbomDiffError as exc:
+        _fail(str(exc))
+
+    typer.echo(render_sbom_diff_json(diff) if as_json else render_sbom_diff_text(diff), nl=False)
+    if exit_code and diff.has_changes:
+        raise typer.Exit(1)

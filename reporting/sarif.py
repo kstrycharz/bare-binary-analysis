@@ -88,9 +88,7 @@ def _rule_descriptor(rule_id: str, findings: list[SarifFinding]) -> dict[str, An
         "id": rule_id,
         "name": rule_id,
         "shortDescription": {"text": sample.title},
-        "fullDescription": {
-            "text": f"BARE rule {rule_id} matched in a shipped artifact."
-        },
+        "fullDescription": {"text": f"BARE rule {rule_id} matched in a shipped artifact."},
         "help": {"text": help_text, "markdown": help_text},
         "defaultConfiguration": {"level": _LEVEL_BY_SEVERITY[worst]},
         "properties": {

@@ -208,9 +208,7 @@ class ToolBox:
         path = str(args.get("artifact_path", ""))
         artifact = self._artifact_index().get(path)
         if artifact is None:
-            return ToolResult(
-                False, "", f"no file {path!r} in this run; call list_files first"
-            )
+            return ToolResult(False, "", f"no file {path!r} in this run; call list_files first")
         if not artifact.storage_key:
             return ToolResult(False, "", f"{path!r} has no stored bytes (it was not retained)")
 

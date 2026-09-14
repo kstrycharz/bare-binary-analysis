@@ -30,9 +30,7 @@ class TestBackwardCompatibility:
         assert analyzer_image("static") == "bare/static:dev"
         assert analyzer_image("unpack") == "bare/unpack:dev"
 
-    def test_an_exported_but_empty_tag_falls_back(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_an_exported_but_empty_tag_falls_back(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The usual shape of a broken deployment script. Honouring it would
         produce `bare/static:` and a daemon error that says nothing about
         the cause."""
@@ -53,16 +51,12 @@ class TestTheTagIsConfigurable:
         for name in ANALYZERS:
             assert analyzer_image(name) == f"bare/{name}:{tag}"
 
-    def test_surrounding_whitespace_is_ignored(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_surrounding_whitespace_is_ignored(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """`export BARE_ANALYZER_TAG="0.1.0 "` is a typo, not a tag."""
         monkeypatch.setenv("BARE_ANALYZER_TAG", "  0.1.0  ")
         assert analyzer_image("static") == "bare/static:0.1.0"
 
-    def test_it_is_read_at_call_time_not_at_import(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_it_is_read_at_call_time_not_at_import(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The constants this replaced were evaluated once when the module
         loaded, so a worker that set the variable after start-up could not
         change them."""
@@ -77,13 +71,9 @@ class TestPerAnalyzerOverride:
     working; it is also the only way to pin a digest or move one analyzer to a
     different registry."""
 
-    def test_a_full_reference_wins_over_the_tag(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_a_full_reference_wins_over_the_tag(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BARE_ANALYZER_TAG", "0.1.0")
-        monkeypatch.setenv(
-            "BARE_STATIC_IMAGE", "registry.internal/bare/static@sha256:abc123"
-        )
+        monkeypatch.setenv("BARE_STATIC_IMAGE", "registry.internal/bare/static@sha256:abc123")
         assert analyzer_image("static") == "registry.internal/bare/static@sha256:abc123"
         # and only that one analyzer is affected
         assert analyzer_image("unpack") == "bare/unpack:0.1.0"

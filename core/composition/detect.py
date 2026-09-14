@@ -254,9 +254,7 @@ def inventory(
         for component in detect_in_file(path, path_in_tree):
             seen.setdefault(component.key, component)
 
-    ordered = sorted(
-        seen.values(), key=lambda c: (c.ecosystem.value, c.name.lower(), c.version)
-    )
+    ordered = sorted(seen.values(), key=lambda c: (c.ecosystem.value, c.name.lower(), c.version))
     return ComponentInventory(
         components=tuple(ordered),
         files_examined=len(files),

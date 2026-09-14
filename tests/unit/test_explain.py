@@ -54,9 +54,7 @@ class FakeProvider(LLMProvider):
     ) -> Completion:
         self.seen = list(messages)
         self.max_tokens_seen = max_tokens
-        return Completion(
-            text=self._text, model=self.model, duration_s=0.1, raw=self._raw
-        )
+        return Completion(text=self._text, model=self.model, duration_s=0.1, raw=self._raw)
 
     def capabilities(self) -> Capabilities:
         return Capabilities(structured_output=True)
@@ -122,12 +120,8 @@ class TestTheSecretNeverLeaves:
         column at all — this pins that."""
         assert not hasattr(finding, "value_plaintext")
 
-    def test_summary_prompt_carries_no_plaintext(
-        self, run: Run, finding: Finding
-    ) -> None:
-        prompt = build_summary_prompt(
-            run, [finding], artifact_name="app.exe", artifact_count=10
-        )
+    def test_summary_prompt_carries_no_plaintext(self, run: Run, finding: Finding) -> None:
+        prompt = build_summary_prompt(run, [finding], artifact_name="app.exe", artifact_count=10)
         assert SECRET not in prompt
 
 
@@ -180,16 +174,12 @@ class TestFailuresReportRatherThanRaise:
         assert text is None
         assert call.error is not None and "connection refused" in call.error
 
-    def test_an_empty_answer_is_not_written_as_an_explanation(
-        self, finding: Finding
-    ) -> None:
+    def test_an_empty_answer_is_not_written_as_an_explanation(self, finding: Finding) -> None:
         text, call = explain_finding(FakeProvider(text="   "), finding, path_in_tree="a")
         assert text is None
         assert finding.llm_explanation is None
 
-    def test_a_reasoning_model_that_ran_out_of_budget_says_so(
-        self, finding: Finding
-    ) -> None:
+    def test_a_reasoning_model_that_ran_out_of_budget_says_so(self, finding: Finding) -> None:
         """The failure the operator actually hits. 'empty response' sends them
         looking at the model; naming the budget sends them to the fix."""
         provider = FakeProvider(text="", raw={"thinking": "let me consider..."})
@@ -197,9 +187,7 @@ class TestFailuresReportRatherThanRaise:
         assert call.error is not None
         assert "token budget" in call.error
 
-    def test_summarize_reports_an_unreachable_model(
-        self, run: Run, finding: Finding
-    ) -> None:
+    def test_summarize_reports_an_unreachable_model(self, run: Run, finding: Finding) -> None:
         result = summarize_run(
             RaisingProvider(), run, [finding], artifact_name="a.exe", artifact_count=1
         )
@@ -256,14 +244,10 @@ class TestSummaryPrompt:
             value_hash="c" * 64,
             status=FindingStatus.OPEN,
         )
-        prompt = build_summary_prompt(
-            run, [low, finding], artifact_name="a.exe", artifact_count=1
-        )
+        prompt = build_summary_prompt(run, [low, finding], artifact_name="a.exe", artifact_count=1)
         assert prompt.index("AWS access key ID") < prompt.index("Repository URL")
 
-    def test_a_successful_summary_is_written_to_the_run(
-        self, run: Run, finding: Finding
-    ) -> None:
+    def test_a_successful_summary_is_written_to_the_run(self, run: Run, finding: Finding) -> None:
         result = summarize_run(
             FakeProvider(text="One critical AWS key."),
             run,

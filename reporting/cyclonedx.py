@@ -53,8 +53,7 @@ def _serial(run_id: str) -> str:
     """
     digest = hashlib.sha256(f"bare:{run_id}".encode()).hexdigest()
     return (
-        f"urn:uuid:{digest[0:8]}-{digest[8:12]}-{digest[12:16]}-"
-        f"{digest[16:20]}-{digest[20:32]}"
+        f"urn:uuid:{digest[0:8]}-{digest[8:12]}-{digest[12:16]}-" f"{digest[16:20]}-{digest[20:32]}"
     )
 
 
@@ -125,9 +124,7 @@ def build_sbom(
                 "bom-ref": f"artifact:{artifact_sha256[:32] or run_id}",
                 "name": artifact_name,
                 "hashes": (
-                    [{"alg": "SHA-256", "content": artifact_sha256}]
-                    if artifact_sha256
-                    else []
+                    [{"alg": "SHA-256", "content": artifact_sha256}] if artifact_sha256 else []
                 ),
                 "properties": [
                     {"name": "bare:run", "value": run_id},
