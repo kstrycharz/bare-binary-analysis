@@ -31,8 +31,10 @@ from core.models import Artifact, Evidence, Run, RunManifest, RunStage, Suppress
 from core.models.base import new_uuid
 from core.models.enums import RunStatus, StageStatus
 from core.pipeline.correlator import correlate
+from core.pipeline.logs import store_stage_log
 from core.pipeline.stages import degraded_stages, describe_degraded
 from core.rules import load_rule_pack
+from core.rules.model import RulePack
 from core.sandbox import (
     BindMount,
     MountMode,
@@ -179,7 +181,7 @@ def _execute(run: Run, session: Session, run_dir: Path) -> ScanOutcome:
     get_object_store().download_to(str(root.storage_key), artifact_path)
 
     # --- S2: unpack ------------------------------------------------------
-    unpack_result, unpack_payload = _run_unpack(run, session, root, unpack_in, unpack_out)
+    unpack_result, unpack_payload = _run_unpack(run, session, root, unpack_in, unpack_out, pack)
     _checkpoint(session, run.id, "index")
     artifacts_by_path = _materialise_tree(run, session, root, unpack_payload, unpack_out)
     # The artifact count is the scan's scale, and this is the moment it becomes
@@ -205,7 +207,9 @@ def _execute(run: Run, session: Session, run_dir: Path) -> ScanOutcome:
     _grant_analyzer_access(scan_out)
 
     # --- S3: static scan over the whole tree ------------------------------
-    static_result, static_payload = _run_static(run, session, root, scan_in, rules_dir, scan_out)
+    static_result, static_payload = _run_static(
+        run, session, root, scan_in, rules_dir, scan_out, pack
+    )
     # Publishes the finished static stage, which is what moves the run into its
     # last phase: correlating evidence into findings and writing the manifest.
     _checkpoint(session, run.id, "report")
@@ -292,7 +296,12 @@ def _checkpoint(session: Session, run_id: str, phase: str) -> None:
 
 
 def _run_unpack(
-    run: Run, session: Session, root: Artifact, staging: Path, results: Path
+    run: Run,
+    session: Session,
+    root: Artifact,
+    staging: Path,
+    results: Path,
+    pack: RulePack,
 ) -> tuple[SandboxResult, dict[str, Any]]:
     _grant_analyzer_access(results)
     stage = RunStage(run_id=run.id, artifact_id=root.id, analyzer="unpack")
@@ -325,7 +334,7 @@ def _run_unpack(
     finally:
         driver.close()
 
-    _record_stage(stage, result)
+    _record_stage(stage, result, pack=pack)
     payload = _read_result(results) or {}
     nodes = payload.get("nodes", [])
     stage.evidence_count = len(nodes)
@@ -345,7 +354,13 @@ def _run_unpack(
 
 
 def _run_static(
-    run: Run, session: Session, root: Artifact, staging: Path, rules_dir: Path, results: Path
+    run: Run,
+    session: Session,
+    root: Artifact,
+    staging: Path,
+    rules_dir: Path,
+    results: Path,
+    pack: RulePack,
 ) -> tuple[SandboxResult, dict[str, Any]]:
     stage = RunStage(run_id=run.id, artifact_id=root.id, analyzer="static")
     stage.started_at = datetime.now(UTC)
@@ -389,7 +404,7 @@ def _run_static(
     finally:
         driver.close()
 
-    _record_stage(stage, result)
+    _record_stage(stage, result, pack=pack)
     payload = _read_result(results) or {}
     stage.evidence_count = sum(len(f.get("matches", [])) for f in payload.get("files", []))
     return result, payload
@@ -565,7 +580,7 @@ def _stage_rules(source: Path, destination: Path) -> None:
         shutil.copy2(version_file, destination / "VERSION")
 
 
-def _record_stage(stage: RunStage, result: SandboxResult) -> None:
+def _record_stage(stage: RunStage, result: SandboxResult, *, pack: RulePack) -> None:
     stage.finished_at = datetime.now(UTC)
     stage.duration_s = round(result.duration_s, 3)
     stage.exit_code = result.exit_code
@@ -582,6 +597,23 @@ def _record_stage(stage: RunStage, result: SandboxResult) -> None:
         SandboxStatus.START_FAILED: StageStatus.FAILED,
         SandboxStatus.ERROR: StageStatus.FAILED,
     }[result.status]
+
+    # The container is already gone (ADR-0003 — the driver reaps it after
+    # collecting output), so this is the only chance these bytes get to
+    # outlive the run. Retention is deliberate: object storage for the
+    # bytes, a key on the row, the rule pack's own detectors over the text
+    # before anything is stored (ADR-0032).
+    key, size, truncated = store_stage_log(
+        get_object_store(),
+        run_id=stage.run_id,
+        stage_id=stage.id,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        pack=pack,
+    )
+    stage.log_key = key
+    stage.log_bytes = size
+    stage.log_truncated = truncated
 
 
 def _read_result(results: Path) -> dict[str, Any] | None:

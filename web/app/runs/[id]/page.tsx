@@ -16,6 +16,7 @@ import { ArtifactTree } from "@/components/artifact-tree";
 import { FindingsExplorer } from "@/components/findings-explorer";
 import { RunSummary } from "@/components/run-summary";
 import { RunProgress } from "@/components/run-progress";
+import { StageLogDisclosure } from "@/components/stage-log-disclosure";
 
 export const dynamic = "force-dynamic";
 
@@ -161,6 +162,7 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
                       <th scope="col" className="px-2 py-1.5 font-medium">Status</th>
                       <th scope="col" className="px-2 py-1.5 font-medium">Duration</th>
                       <th scope="col" className="px-2 py-1.5 font-medium">Output</th>
+                      <th scope="col" className="px-2 py-1.5 font-medium">Log</th>
                       <th scope="col" className="px-4 py-1.5 font-medium">Image</th>
                     </tr>
                   </thead>
@@ -176,6 +178,15 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
                         </td>
                         <td className="px-2 py-1.5 tnum text-content-muted">
                           {stage.evidence_count}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <StageLogDisclosure
+                            runId={run.id}
+                            stageId={stage.id}
+                            logBytes={stage.log_bytes}
+                            logTruncated={stage.log_truncated}
+                            degraded={stage.status !== "completed"}
+                          />
                         </td>
                         <td className="px-4 py-1.5">
                           <Mono className="text-content-subtle" title={stage.image_digest ?? ""}>

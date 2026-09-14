@@ -795,3 +795,86 @@ two unhealthy providers nobody asked for. Inert beats plausible-but-wrong.
 **Cache the probe results.** The page's own text says a stale green tick is
 worse than none, and that is right: "test connection" is the question being
 asked. Making the probe fast is the fix; making it rare is an evasion.
+
+---
+
+## ADR-0032 — Analyzer logs are retained in object storage, redacted at write time
+
+**Date:** 2026-09-11
+**Status:** Accepted
+
+### Context
+
+`DockerDriver._collect_logs()` already reads stdout/stderr and caps them at
+8 MiB, but the bytes then died on the `SandboxResult`: `RunStage` had an
+`error` column and nothing else, so a degraded scan could not be diagnosed
+after the fact — the container it would `docker logs` had already been reaped
+(ADR-0003). The bounty (`analyzer-logs`) names three hazards: the logs are
+untrusted output derived from a customer's binary, they can contain secrets
+the analyzer was looking at, and a 213 MB installer can make them large.
+
+### Decision
+
+**Pointer on the row, bytes in the bucket.** `RunStage` gains `log_key`
+(text, nullable), `log_bytes`, and `log_truncated` — all fixed-width — and
+the document itself goes into the artifact bucket under a `logs/{run_id}/
+{stage_id}.txt` prefix. "A chatty analyzer cannot grow a row without bound"
+is then true by construction rather than by vigilance, and a future `make
+purge` has one prefix to sweep.
+
+**Redaction happens at write time, unconditionally.** The joined stdout/
+stderr document is passed through the run's own rule pack (`scan_bytes`) and
+every matched value replaced with the standard `mask()` before the object is
+written. This holds even when the run did *not* opt into plaintext
+retention: the retention opt-in is a statement about finding values the
+pipeline validated, not about unbounded, unvalidated analyzer echo of the
+customer's binary. Same detectors, same masking ⇒ the log cannot reveal a
+secret the report masked.
+
+**The guarantee is scoped honestly: pack-equivalent masking, not better.**
+The log is scanned by exactly the detectors that scanned the artifact. A
+value the report would mask in a finding is masked in the log (verified: an
+`AKIA…` access-key ID echoed in log text stores masked); a value the pack
+cannot identify without context — a bare 40-char base64 string, which needs
+an AWS marker nearby by design, because the same shape occurs in every code
+signing certificate and PDF stream — is not masked in either place. The
+false-positive corpus (public docs examples) is honoured identically.
+Equivalence, not a gap: tightening beyond the pack would over-mask ordinary
+base64-heavy analyzer output for a text nobody has flagged as a secret; if
+a deployment needs more, that is a rule-pack change, made once, audited.
+
+**Capped at write time** at 256 KiB per stream — comfortably above any real
+analyzer's error output, under any realistic accumulation — and the document
+says `[bare: stored log truncated]` rather than cutting silently.
+
+**Read path:** `GET /api/runs/{id}/stages/{stage_id}/logs`, ADMIN-scoped
+(log text is masked secret-adjacent context — it sits with the findings
+corpus, not the CI surface), served as `text/plain` with
+`Content-Security-Policy: default-src 'none'; sandbox` and `nosniff`. The
+dashboard renders it into a `<pre>` — an inert character stream end to end;
+nothing on the path parses the analyzer's output as markup.
+
+A bucket write failure warns and stores nothing rather than failing the scan
+(ADR-0008); the row reads `log_key = NULL` and the endpoint says
+"no log retained for this stage", which is the truth, where an empty 200
+would be a lie about a different truth.
+
+### Alternatives rejected
+
+**A Text column on `run_stages`.** Every `RunStage` read — the progress
+stream polls the table every two seconds — would drag up to 8 MiB of log
+through the ORM. The run table is a hot path; a log is a cold one.
+
+**Object storage only, no columns.** Then "does this stage have a log?" —
+which the UI must answer per row on render — costs a HEAD per stage per page
+view, and `log_truncated` has nowhere to live.
+
+**LLM-layer redaction reuse.** The provider-layer redaction is shaped for
+*prompts to models* (what may leave the box). This is retention on the box;
+keying it off the rule pack ties the guarantee to "the same detectors that
+wrote the findings", which is the sentence an auditor needs.
+
+**Storing unredacted and redacting on read.** Every read becomes a
+rule-pack scan of 512 KiB, a future read path can forget to do it, and the
+unredacted bytes sit in the bucket anyway. Redact once, at the only moment
+all the context (which pack ran) is unambiguous.

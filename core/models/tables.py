@@ -190,6 +190,14 @@ class RunStage(Base, TimestampMixin):
     error: Mapped[str | None] = mapped_column(Text)
     evidence_count: Mapped[int] = mapped_column(Integer, default=0)
 
+    # --- retained analyzer output (bounty: analyzer-logs) -------------------
+    # Key + size + flag only. The bytes live in object storage under a
+    # `logs/` prefix — a chatty analyzer must never be able to grow this row
+    # (ADR-0032).
+    log_key: Mapped[str | None] = mapped_column(Text)
+    log_bytes: Mapped[int | None] = mapped_column(Integer)
+    log_truncated: Mapped[bool] = mapped_column(Boolean, default=False)
+
     run: Mapped[Run] = relationship(back_populates="stages")
 
 
