@@ -82,7 +82,20 @@ services:
   beat:
     environment:
       BARE_LOG_JSON: "false"
-    volumes: *dev-source
+    volumes:
+      - ./core:/app/core
+      - ./api:/app/api
+      - ./cli:/app/cli
+      - ./reporting:/app/reporting
+      - ./mcp:/app/mcp
+      - ./detections:/app/detections
+      - ./config:/app/config
+      - ./sandbox:/app/sandbox
+      - ./tests:/app/tests
+      # The heartbeat lives here in the reference deployment. A list replaces
+      # rather than merges on overlay, so the dev source mounts have to be
+      # repeated here before it can also carry the named volume.
+      - backend-data:/app/data
 
   web:
     build:
