@@ -72,14 +72,18 @@ class TestAWedgedWorkerIsVisible:
         assert "healthcheck:" in service, f"{name} has no healthcheck"
         assert "core.orchestrator.health" in service
 
-    def test_beat_says_why_it_has_none(self) -> None:
-        """Beat answers no `inspect ping`. Inventing a check that cannot fail
-        would be worse than the gap, so the gap is written down."""
+    def test_beat_reads_its_own_heartbeat(self) -> None:
+        """Beat answers no `inspect ping` (it is not a worker node) and the
+        slim image has no pgrep. The gap §6 carried as debt is closed a
+        different way: the scheduler touches a file each tick and the check
+        reads its age (ADR-0033)."""
         service = compose_service("beat")
-        # The key, not the word — the comment explaining the absence says
-        # "No healthcheck:" and would otherwise match.
-        assert "    healthcheck:" not in service
-        assert "No healthcheck" in service
+        assert "    healthcheck:" in service
+        assert "core.orchestrator.beat_health" in service
+        # The volume is the channel: beat writes the file, the healthcheck
+        # (a separate process) reads it. A check without the mount can only
+        # ever report "file missing".
+        assert "backend-data:/app/data" in service
 
 
 class TestLogsCannotFillTheDisk:
