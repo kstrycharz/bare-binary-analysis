@@ -334,9 +334,32 @@ policy:
   redaction: strict
 ```
 
-`egress: deny` still permits loopback and private addresses — an Ollama box on
-your own LAN is not egress in any sense a security team cares about. Cloud
-providers are blocked under this setting and fail at config load, not mid-scan.
+`egress: deny` still permits loopback and private addresses — an Ollama or vLLM
+box on your own LAN is not egress in any sense a security team cares about.
+Cloud providers are blocked under this setting and fail at config load, not
+mid-scan.
+
+Three things to know when the provider lives on another machine, not this one:
+
+- **Use the IP, not a bare hostname.** The guard classifies the URL's literal
+  host — `http://192.168.1.50:8000` and `http://vllm-box.local:8000` (mDNS) are
+  recognised as local; `http://vllm-box:8000` is **blocked** under `deny`,
+  because proving a plain hostname resolves to a private address would mean
+  trusting DNS, and "cannot tell" under a deny policy means refuse.
+  `policy.allowed_hosts` narrows an `allow` policy; it cannot widen a `deny`
+  one. If you must use a hostname, that is `BARE_EGRESS_POLICY=allow` plus
+  `allowed_hosts: [vllm-box]` to keep everything else refused.
+- **Reserve the lease.** A static IP or DHCP reservation on the model box: if
+  its address changes to a different device on the subnet, BARE still treats it
+  as local, because that is what the address says.
+- **The probe runs inside a container**, not on your workstation. Docker
+  Desktop reaches host-LAN IPs through the VM's NAT in almost all cases; when a
+  provider shows *unreachable* in the UI but `curl` from Windows works, check
+  from the container:
+
+  ```bash
+  docker compose exec api python -c "import httpx; print(httpx.get('http://192.168.1.50:8000/v1/models', timeout=5).status_code)"
+  ```
 
 Verify from inside the worker, which is what actually makes the calls:
 
