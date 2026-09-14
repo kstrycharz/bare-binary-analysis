@@ -135,7 +135,7 @@ waivers:
 
 ```yaml
 waivers:
-  - finding_id: 3f2a91c4e8b7d05a
+  - finding_id: 3f2a91c4e8b7d05a9c1e44b2d7f08a61
     reason: >-
       Vendor SDK sample key inside the bundled redistributable. Confirmed
       inert with the vendor; tracked in SEC-4471 for the 2.5 SDK bump.
@@ -148,6 +148,17 @@ is a permanent hole that outlives the reason it was granted for and the person
 who granted it — the loader rejects one rather than defaulting it. An expired
 waiver blocks the build *and says so*, which is what brings the decision back
 for review while it still matters.
+
+Don't hand-edit it under pressure. Copy the id from the failed build and run:
+
+```bash
+bare waive 3f2a91c4e8b7d05a9c1e44b2d7f08a61 --reason "Vendor SDK sample key, SEC-4471" --owner kyle@example.com --expires 30d
+```
+
+It checks the waiver against the same policy the gate uses — owner, reason,
+expiry, and `max_ttl_days` — and appends it without disturbing the file's
+comments. It refuses a shortened id: waivers match the full 32-character id
+exactly, so a prefix would never apply. `--dry-run` prints the entry instead.
 
 
 ### Re-gating without re-scanning

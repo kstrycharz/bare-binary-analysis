@@ -64,6 +64,8 @@ class RunSummary(BaseModel):
 class StageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    id: str
+    """The stage row id — the handle the logs endpoint is addressed by."""
     analyzer: str
     status: str
     duration_s: float | None = None
@@ -71,6 +73,10 @@ class StageOut(BaseModel):
     evidence_count: int = 0
     error: str | None = None
     image_digest: str | None = None
+    log_bytes: int | None = None
+    """Size of the retained analyzer output. The bytes live in object storage;
+    this row only points at them, so a chatty analyzer cannot grow it."""
+    log_truncated: bool = False
 
 
 class ManifestOut(BaseModel):

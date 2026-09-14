@@ -72,21 +72,66 @@ class Completion:
         Small local models routinely emit fenced code blocks or a sentence
         before the object. Failing the whole triage pass over a stray ```json
         would be a poor trade.
+
+        The fallback scans for the first *balanced* object rather than slicing
+        first-brace to last-brace: a reasoning model that thinks out loud
+        before answering ("the entropy is high {see §2} ... here is my call:
+        {\"verdict\": ...}") makes that slice swallow the prose and fail to
+        parse, which reads to the operator as \"did not return parseable
+        JSON\" for a response that plainly contains one.
         """
         text = self.text.strip()
         if text.startswith("```"):
             text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
         try:
-            parsed: dict[str, Any] = json.loads(text)
+            parsed: dict[str, Any] | None = json.loads(text)
         except json.JSONDecodeError:
-            start, end = text.find("{"), text.rfind("}")
-            if start < 0 or end <= start:
-                return None
-            try:
-                parsed = json.loads(text[start : end + 1])
-            except json.JSONDecodeError:
-                return None
-        return parsed
+            parsed = _first_json_object(text)
+        return parsed if isinstance(parsed, dict) else None
+
+
+def _first_json_object(text: str) -> dict[str, Any] | None:
+    """The first balanced ``{...}`` object in `text`, or None.
+
+    Brace depth is tracked outside string literals (an escaped quote inside a
+    value must not desynchronise the scan), so prose braces, quoted braces, and
+    nesting are all handled by one pass.
+    """
+    start = text.find("{")
+    while start >= 0:
+        depth = 0
+        in_string = False
+        escaped = False
+        for i in range(start, len(text)):
+            ch = text[i]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+            elif ch == '"':
+                in_string = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        candidate = json.loads(text[start : i + 1])
+                    except json.JSONDecodeError:
+                        break  # balanced but invalid; try the next '{'
+                    if isinstance(candidate, dict):
+                        return candidate
+                    break
+        else:
+            # Ran out of text with this object still open. If the response was
+            # truncated that is the end of it, but an opening prose brace must
+            # not blind the scan to a real object after it — try the next '{'.
+            pass
+        start = text.find("{", start + 1)
+    return None
 
 
 @dataclass(frozen=True, slots=True)

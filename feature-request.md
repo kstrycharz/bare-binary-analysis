@@ -65,7 +65,13 @@ no network and no Docker socket — that are not up for negotiation in a PR.
 
 ## Open bounties
 
-### `analyzer-logs` — keep the logs the scanning containers produce · **S**
+### ~~`analyzer-logs`~~ — keep the logs the scanning containers produce · **S** · **DONE**
+
+Delivered as `GET /api/runs/{id}/stages/{stage_id}/logs` + a disclosure column on the
+stages table; retention in object storage with write-time redaction (ADR-0032).
+
+<details>
+<summary>Original bounty</summary>
 
 Today the container's output is collected and then thrown away.
 `DockerDriver._collect_logs()` reads stdout and stderr, caps them at
@@ -93,6 +99,8 @@ panel next to the stage row would do it.
 **Done when:** a deliberately failing analyzer run shows its output in the
 dashboard, the redaction policy demonstrably applies, and a very chatty analyzer
 cannot grow a row without bound.
+
+</details>
 
 ---
 
@@ -211,7 +219,12 @@ against the three small Python ones that already agree with each other.
 
 ---
 
-### `runs-live` — the Runs tab does not show runs that are running · **S**
+### ~~`runs-live`~~ — the Runs tab does not show runs that are running · **S** · **DONE**
+
+Delivered as `GET /api/runs/events` + the `RunsLive` wrapper (ADR-0031).
+
+<details>
+<summary>Original bounty</summary>
 
 Start a scan, click **Runs**, and the run you just started is often not there.
 
@@ -243,6 +256,8 @@ run-list events, or poll at a sane interval and only while a run is active.
 
 **Done when:** starting a scan in one tab makes it appear in the Runs tab of
 another without a manual reload, and a completing run updates in place.
+
+</details>
 
 ---
 
@@ -354,7 +369,12 @@ scheduler is currently only visible in logs. Probably a heartbeat file plus a
 check that reads its mtime. **Good first bounty** — self-contained, and there is
 a worked example to copy in `core/orchestrator/health.py`.
 
-### `waive` — `bare waive <id>` · **S**
+### ~~`waive`~~ — `bare waive <id>` · **S** · **DONE**
+Delivered as `bare waive`. Building it turned up the real bug: the gate's text
+output printed a 12-character id prefix, and waivers match the full id exactly,
+so a waiver copied from a red build never applied. The output now prints the
+full id, and `bare waive` refuses a prefix and says why.
+
 CI prints finding ids; turning one into a waiver means hand-editing YAML, which
 is where waivers acquire missing owners and absent expiries. Wanted:
 `bare waive <id> --reason ... --expires ...` appending a well-formed entry.
@@ -378,7 +398,12 @@ The gate already computes "what did this build introduce" against a baseline
 run. That computation exists and is tested; it is just not surfaced anywhere a
 human can look. Mostly a UI bounty on top of logic that is already correct.
 
-### `sbom-diff` — what changed between two builds · **S**
+### ~~`sbom-diff`~~ — what changed between two builds · **S** · **DONE**
+Delivered as `bare sbom-diff A B`, where each side is a run id or an SBOM file.
+Components match on purl identity without the version, so an upgrade is one
+change rather than a removal and an addition; licence changes are reported too,
+and a diff against an incomplete inventory says so.
+
 SBOM export is deterministic by design: no clock, no random serial, so two
 exports of a run are byte-identical specifically so they can be diffed. Nothing
 does the diffing. `bare sbom-diff RUN_A RUN_B` reporting added, removed, and
@@ -414,6 +439,31 @@ Self-hosted software gets run by people with a monitoring stack. Queue depth,
 scan duration by profile, analyzer failure rate by image, and stage degradation
 counts are all already computed and thrown away. Must not leak finding content
 into labels.
+
+### `readme-screenshots` — show the product in the README · **S**
+The README is ~280 lines of prose and not one image. Someone deciding whether to
+run `docker compose up` cannot see what they would get: the run list, the upload
+form with its attestation, a run page with findings and the artifact tree, an
+explanation or investigation transcript, the setup wizard, and — for the CI
+audience — what `bare scan` prints when it blocks a build.
+
+Wanted: screenshots of those views in `docs/images/`, placed in the README where
+the prose already describes them, each with real alt text.
+
+**Watch out for:**
+- **§9 applies to pictures too.** Every screenshot comes from scanning a synthetic
+  fixture built from provably-invalid shapes (`AKIAIOSFODNN7EXAMPLE`), with no
+  real hostnames, usernames, or tokens in view — and nothing with plaintext
+  retention switched on. gitleaks does not read PNGs, so review is the only check.
+- **No model output presented as a finding.** An AI panel in a screenshot is
+  labelled as advisory, the same way it is in the product.
+- **They will rot.** Prefer a small script (Playwright against the Compose stack
+  and a seeded run) that regenerates them, over hand-captured images nobody
+  updates after the next UI change.
+- Size. Compress them; a README that pulls 20 MB of PNGs is its own problem.
+
+**Done when:** a first-time reader can see the dashboard and a blocked CI run
+without installing anything, and the images can be regenerated with one command.
 
 ### `dogfood` — scan BARE's own releases · **S**
 The README claims BARE is a build-pipeline stage gate. Nothing currently verifies

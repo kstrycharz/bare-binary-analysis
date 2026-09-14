@@ -9,7 +9,7 @@ from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,7 @@ from core.db import get_session, session_scope
 from core.models import Artifact, Finding, FindingLocation, Run, RunStage
 from core.models.enums import RunStatus, StageStatus
 from core.pipeline.ingest import AttestationRequired, ingest_artifact
+from core.storage import get_object_store
 
 log = structlog.get_logger(__name__)
 
@@ -571,6 +572,50 @@ def _build_tree(session: Session, run: Run) -> tuple[ArtifactOut | None, bool]:
 
     roots = by_parent.get(None, [])
     return (build(roots[0]) if roots else None), truncated
+
+
+# The log of one analyzer stage. ADMIN, not CI: retained log text is masked
+# with the run's own detectors, but it is still derived from a customer's
+# binary and belongs behind the same gate as the findings corpus (ADR-0032).
+@router.get(
+    "/{run_id}/stages/{stage_id}/logs",
+    dependencies=[Depends(require_scope(Scope.ADMIN))],
+    response_class=PlainTextResponse,
+)
+def get_stage_logs(
+    run_id: str,
+    stage_id: str,
+    session: Annotated[Session, Depends(get_session)],
+) -> PlainTextResponse:
+    """The retained stdout/stderr of one stage, as plain text.
+
+    ``text/plain`` is the whole XSS story: a browser and the dashboard alike
+    get inert characters, never markup. The dashboard renders it into a
+    ``<pre>`` with no HTML parsing on the path from bucket to pixels.
+    """
+    stage = session.get(RunStage, stage_id)
+    if stage is None or stage.run_id != run_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "stage not found")
+    if not stage.log_key:
+        # A stage from before log retention, or one whose bucket write failed.
+        # 404 with a reason rather than an empty 200: an empty log and no log
+        # are different facts, and only one of them is a lie about the first.
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no log retained for this stage")
+
+    from core.pipeline.logs import read_stage_log
+
+    try:
+        text = read_stage_log(get_object_store(), stage.log_key)
+    except Exception as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"log unreadable: {exc}") from None
+    return PlainTextResponse(
+        text,
+        headers={
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.post("/{run_id}/discover", dependencies=[Depends(require_scope(Scope.ADMIN))])

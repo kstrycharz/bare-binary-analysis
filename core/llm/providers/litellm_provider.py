@@ -240,7 +240,42 @@ class LiteLLMProvider(LLMProvider):
             model=self.model,
             detail="reachable, and the credential works",
             latency_s=round(latency, 3),
+            available_models=self._list_models(timeout_s),
         )
+
+    def _list_models(self, timeout_s: float) -> tuple[str, ...]:
+        """Best-effort model listing for OpenAI-compatible endpoints.
+
+        vLLM, LM Studio, and every LiteLLM proxy answer `GET /models` on the
+        base URL, and those are precisely the providers an operator picks
+        models *from* on the settings page. Hosted vendors with no base URL
+        have no such route, and guessing at api.litellm.ai-style endpoints
+        would send traffic somewhere the egress policy never approved — so
+        this only ever runs when we already hold a URL, and a failure to list
+        is invisible: reachability and the credential were just proven by the
+        completion above.
+        """
+        if not self.base_url:
+            return ()
+        import httpx
+
+        try:
+            headers = {"authorization": f"Bearer {self._api_key}"} if self._api_key else {}
+            response = httpx.get(
+                f"{self.base_url}/models",
+                headers=headers,
+                timeout=timeout_s,
+                follow_redirects=False,
+            )
+            response.raise_for_status()
+            data = response.json()
+            models = tuple(str(entry["id"]) for entry in data.get("data", []) if entry.get("id"))
+        except Exception:
+            return ()
+        # Prefix them the way LiteLLM routes: `hosted_vllm/qwen3.8-flash-next`
+        # is what `provider_models` needs written back, not the bare id.
+        prefix = self.model.split("/", 1)[0] if "/" in self.model else ""
+        return tuple(f"{prefix}/{m}" if prefix else m for m in models)
 
 
 def _explain_failure(exc: Exception, api_key: str | None) -> str:

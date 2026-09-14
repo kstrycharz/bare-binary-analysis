@@ -66,6 +66,13 @@ class ObjectStore:
         self._bucket = bucket or settings.s3_bucket_artifacts
 
     @property
+    def bucket(self) -> str:
+        """The bucket this store writes to. Public because non-artifact
+        objects (stage logs) share it under a distinct prefix and must not
+        re-derive it from settings and drift."""
+        return self._bucket
+
+    @property
     def client(self) -> Any:
         if self._client is None:
             import boto3
