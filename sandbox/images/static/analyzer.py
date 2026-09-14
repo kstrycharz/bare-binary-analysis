@@ -495,8 +495,7 @@ def main(argv: list[str] | None = None) -> int:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     RESULT_PATH.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(
-        f"scanned {len(artifacts)} file(s) with {workers} worker(s): "
-        f"{total_matches} matches",
+        f"scanned {len(artifacts)} file(s) with {workers} worker(s): " f"{total_matches} matches",
         flush=True,
     )
     if inventory is not None:

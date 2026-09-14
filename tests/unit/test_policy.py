@@ -252,9 +252,7 @@ def test_verdict_is_order_independent() -> None:
     ]
     forward = evaluate(findings, Policy(), today=TODAY)
     backward = evaluate(list(reversed(findings)), Policy(), today=TODAY)
-    assert [v.finding_id for v in forward.violations] == [
-        v.finding_id for v in backward.violations
-    ]
+    assert [v.finding_id for v in forward.violations] == [v.finding_id for v in backward.violations]
 
 
 def test_violations_are_ordered_most_severe_first() -> None:

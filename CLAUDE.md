@@ -95,7 +95,7 @@ make install && make sandbox-check     # ./make.ps1 on Windows
 - CI runs lint, mypy strict, unit tests, the isolation suite, a gitleaks scan,
   the web build, and a stack-boots check.
 
-Verified: 586 unit tests, 19 integration tests, `mypy --strict` clean on
+Verified: 696 unit tests, 19 integration tests, `mypy --strict` clean on
 `core/`, `ruff` clean, `next build` clean.
 
 Not yet started: Ghidra and dynamic analysis (M5), MCP servers (M5), and the
@@ -163,17 +163,13 @@ mostly about the tool being *lived with* rather than demonstrated.
    built artifacts on every release tag. Dogfooding is the fastest way to find
    out which parts of `docs/CICD.md` are wrong, and it is the one claim in the
    README that nothing currently verifies.
-2. **Waiver ergonomics.** The CI output prints finding ids; there is no
-   `bare waive <id> --reason ... --expires ...` to append a well-formed
-   entry. Hand-editing YAML under time pressure is where waivers acquire
-   missing owners and absent expiries.
-3. **Plaintext retention needs its TTL.** §9 promises encryption at rest, a
+2. **Plaintext retention needs its TTL.** §9 promises encryption at rest, a
    TTL, and auto-purge. None of the three exists, so a run scanned with
    retention on leaves real secrets in Postgres indefinitely. The UI says so at
    the point of choosing, which is not the same as the promise being kept.
-4. **The Go string-blob problem** (§6). It affects every rule on every Go
+3. **The Go string-blob problem** (§6). It affects every rule on every Go
    binary and needs a Go-aware splitter, not a per-rule patch.
-5. **Decide about `remediate`.** It is routable and described in the settings
+4. **Decide about `remediate`.** It is routable and described in the settings
    UI as unwired. Either wire it or drop it from `EDITABLE_ROLES`; leaving a
    configurable role that does nothing is how the explain/summarize gap started.
 

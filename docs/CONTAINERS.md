@@ -41,8 +41,8 @@ containers.
 | --- | --- | --- | --- | --- | --- |
 | `postgres` | service | `postgres:16-alpine` | unless-stopped | `pg_isready` | no |
 | `redis` | service | `redis:7-alpine` | unless-stopped | `redis-cli ping` | no |
-| `minio` | service | `minio/minio` (pinned) | unless-stopped | `mc ready local` | no |
-| `minio-init` | one-shot | `minio/mc` (pinned) | no | — | no |
+| `minio` | service | `quay.io/minio/minio` (pinned) | unless-stopped | `mc ready local` | no |
+| `minio-init` | one-shot | `quay.io/minio/mc` (pinned) | no | — | no |
 | `api` | service | built, `deploy/Dockerfile.backend` | unless-stopped | `GET /healthz` | root in container, **no Docker socket** |
 | `worker` | service | built, same image as `api` | unless-stopped | Celery ping to its own node | **Docker socket — root-equivalent on the host** |
 | `worker-heavy` | service | built, same image as `api` | unless-stopped | Celery ping to its own node | **Docker socket — root-equivalent on the host** |

@@ -133,9 +133,7 @@ def test_gate_blocks_and_reports_its_exit_code(client: TestClient) -> None:
 
 
 def test_gate_honours_a_supplied_policy(client: TestClient) -> None:
-    response = client.post(
-        "/api/runs/run-1/gate", json={"policy_yaml": POLICY_BLOCKING_ALL}
-    )
+    response = client.post("/api/runs/run-1/gate", json={"policy_yaml": POLICY_BLOCKING_ALL})
     assert response.status_code == 200
     assert response.json()["policy_name"] == "strict"
 

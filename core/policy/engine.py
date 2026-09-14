@@ -211,9 +211,7 @@ def _budget_violations(findings: list[GateFinding], policy: Policy) -> list[Viol
             violations.append(
                 Violation(
                     kind=ViolationKind.BUDGET_EXCEEDED,
-                    detail=(
-                        f"{count} {severity.value} findings exceed the budget of {limit}"
-                    ),
+                    detail=(f"{count} {severity.value} findings exceed the budget of {limit}"),
                     severity=severity,
                 )
             )
@@ -224,18 +222,14 @@ def _waiver_exceeds_ttl(waiver: Waiver, policy: Policy, today: date) -> bool:
     return (waiver.expires - today).days > policy.max_waiver_days
 
 
-def _decide(
-    violations: list[Violation], stages: tuple[str, ...], policy: Policy
-) -> GateDecision:
+def _decide(violations: list[Violation], stages: tuple[str, ...], policy: Policy) -> GateDecision:
     """A degraded scan with no findings is INCONCLUSIVE, not BLOCKED.
 
     The distinction is real: "we found a problem" and "we could not finish
     looking" call for different responses from a release manager, and
     collapsing them into one failure teaches people to retry until it passes.
     """
-    degraded_only = violations and all(
-        v.kind is ViolationKind.DEGRADED_SCAN for v in violations
-    )
+    degraded_only = violations and all(v.kind is ViolationKind.DEGRADED_SCAN for v in violations)
     if degraded_only:
         return GateDecision.INCONCLUSIVE
     if violations:

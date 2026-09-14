@@ -32,8 +32,7 @@ class TestPackageUrls:
         """The spec's own example. Stripping the `@` yields a purl that looks
         right and matches nothing in any advisory database."""
         assert (
-            _component("@angular/animation", "12.3.1").purl
-            == "pkg:npm/%40angular/animation@12.3.1"
+            _component("@angular/animation", "12.3.1").purl == "pkg:npm/%40angular/animation@12.3.1"
         )
 
     def test_unscoped_npm(self) -> None:
@@ -156,9 +155,7 @@ class TestInventory:
             directory = tmp_path / name
             directory.mkdir()
             manifest = directory / "package.json"
-            manifest.write_text(
-                json.dumps({"name": name, "version": "1.0.0"}), encoding="utf-8"
-            )
+            manifest.write_text(json.dumps({"name": name, "version": "1.0.0"}), encoding="utf-8")
             files.append((manifest, f"{name}/package.json"))
 
         first = inventory(files).components
@@ -279,9 +276,7 @@ class TestLicenceExpressions:
         )
         assert detect_in_file(manifest, "x")[0].licence == declared
 
-    def test_a_component_with_no_usable_licence_is_still_a_component(
-        self, tmp_path: Path
-    ) -> None:
+    def test_a_component_with_no_usable_licence_is_still_a_component(self, tmp_path: Path) -> None:
         """Dropping the licence must not drop the component — an unlicensed
         entry in the inventory is the one someone needs to go and check."""
         manifest = tmp_path / "package.json"

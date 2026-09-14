@@ -90,9 +90,7 @@ def fingerprint(doc: dict) -> str:
     """Hash of everything except the self-reported duration, which of course
     differs between a fast run and a slow one."""
     stable = {k: v for k, v in doc.items() if k != "duration_s"}
-    return hashlib.sha256(
-        json.dumps(stable, sort_keys=True).encode("utf-8", "replace")
-    ).hexdigest()
+    return hashlib.sha256(json.dumps(stable, sort_keys=True).encode("utf-8", "replace")).hexdigest()
 
 
 def main() -> int:

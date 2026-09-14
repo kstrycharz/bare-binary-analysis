@@ -46,7 +46,9 @@ def render_text(verdict: GateVerdict, *, artifact: str = "", run_url: str = "") 
         for violation in verdict.violations:
             lines.append(f"    {violation.render()}")
             if violation.finding_id:
-                lines.append(f"             {violation.detail}  [{violation.finding_id[:12]}]")
+                # The full id, never a prefix: waivers are matched exactly, and
+                # this line is what people copy into one.
+                lines.append(f"             {violation.detail}  [{violation.finding_id}]")
             else:
                 lines.append(f"             {violation.detail}")
         lines.append("")
@@ -95,8 +97,8 @@ def _next_step(verdict: GateVerdict) -> str:
         )
     return (
         "Remove the value from the artifact and rotate it if it is live. "
-        "If it is genuinely benign, add a time-boxed waiver to "
-        ".bare/waivers.yaml with an owner and a reason."
+        "If it is genuinely benign, waive it for a limited time: "
+        "bare waive <finding-id> --reason ... --owner ... --expires 30d"
     )
 
 
@@ -169,13 +171,15 @@ def render_markdown(verdict: GateVerdict, *, artifact: str = "", run_url: str = 
         lines += [
             "### Blocking findings",
             "",
-            "| Severity | Finding | Location | Why |",
-            "| --- | --- | --- | --- |",
+            "| Severity | Finding | Location | Why | Id |",
+            "| --- | --- | --- | --- | --- |",
         ]
         for v in verdict.violations:
             severity = v.severity.value if v.severity else "—"
+            finding = f"`{v.finding_id}`" if v.finding_id else "—"
             lines.append(
-                f"| {severity} | {v.title or '—'} | `{v.artifact_path or '—'}` | {v.detail} |"
+                f"| {severity} | {v.title or '—'} | `{v.artifact_path or '—'}` "
+                f"| {v.detail} | {finding} |"
             )
         lines.append("")
 

@@ -187,9 +187,7 @@ class TestRunningRuns:
 
 
 class TestScope:
-    @pytest.mark.parametrize(
-        "status", [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED]
-    )
+    @pytest.mark.parametrize("status", [RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED])
     def test_terminal_runs_are_never_touched(self, session: Session, status: str) -> None:
         run = _run(session, "done", status=status, age_s=99_999, started_age_s=99_999)
         sweep = sweep_orphaned_runs(session, now=NOW)
