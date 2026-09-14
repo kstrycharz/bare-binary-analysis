@@ -203,6 +203,59 @@ class TestKeysStayOutOfErrors:
         assert "key was rejected" in _explain_failure(AuthenticationError("nope"), None)
 
 
+class TestTheHealthProbeListsModelsWhenItCan:
+    """The settings page offers models from what an endpoint reports. Only
+    OpenAI-compatible servers (vLLM, LM Studio, a LiteLLM proxy) answer
+    GET /models, and those are exactly the ones an operator picks models from;
+    a hosted vendor with no base URL must not be probed for one at all."""
+
+    def _provider(self, **kwargs: object) -> LiteLLMProvider:
+        return LiteLLMProvider(
+            model="hosted_vllm/qwen3.8-flash-next",
+            guard=EgressPolicyGuard(allow_egress=True),
+            **kwargs,  # type: ignore[arg-type]
+        )
+
+    def test_a_base_url_gets_its_models_prefixed_the_way_litellm_routes(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import httpx
+
+        class Response:
+            def raise_for_status(self) -> None: ...
+            def json(self) -> dict:
+                return {"data": [{"id": "qwen3.8-flash-next"}, {"id": "llama3.3-70b"}]}
+
+        monkeypatch.setattr(httpx, "get", lambda *a, **k: Response())
+        provider = self._provider(base_url="http://10.0.0.5:8000/v1")
+        assert provider._list_models(5.0) == (
+            "hosted_vllm/qwen3.8-flash-next",
+            "hosted_vllm/llama3.3-70b",
+        )
+
+    def test_no_base_url_means_no_listing_request(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Guessing at a vendor URL from a probe would send traffic the egress
+        policy never approved. Hosted keys have no /models route to hit."""
+        import httpx
+
+        def never(*a: object, **k: object) -> object:
+            raise AssertionError("the probe must not request a URL it does not hold")
+
+        monkeypatch.setattr(httpx, "get", never)
+        assert self._provider()._list_models(5.0) == ()
+
+    def test_a_server_without_the_route_is_still_healthy(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import httpx
+
+        def boom(*a: object, **k: object) -> object:
+            raise httpx.ConnectError("no route")
+
+        monkeypatch.setattr(httpx, "get", boom)
+        assert self._provider(base_url="http://10.0.0.5:8000/v1")._list_models(5.0) == ()
+
+
 class TestLocality:
     """`is_local` is what the redaction layer keys off, so it is keyed to the
     endpoint rather than to the vendor: a vLLM box on the LAN is local, and

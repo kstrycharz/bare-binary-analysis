@@ -223,7 +223,8 @@ def discover_rules(
         # the answer, so a budget sized for the JSON returns nothing at all —
         # measured here: glm-4.7-flash consumed 2000 tokens deliberating and
         # emitted no content. That is a routing problem, not a model problem.
-        if completion.raw.get("thinking") and not completion.text:
+        # Thinking plus an answer cut off mid-JSON is the same problem.
+        if completion.raw.get("thinking"):
             reason = (
                 "the model exhausted its token budget on reasoning without "
                 "producing an answer. Route the `discover` role to a "

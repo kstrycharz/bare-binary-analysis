@@ -220,11 +220,13 @@ def investigate_finding(
 
         payload = completion.as_json()
         if not payload:
-            if completion.raw.get("thinking") and not completion.text:
+            if completion.raw.get("thinking"):
+                # Thinking present and nothing parseable — an empty answer or
+                # one truncated mid-JSON. Both are the budget, not the parser.
                 result.error = (
                     "the model exhausted its token budget on reasoning without "
-                    "producing an answer; raise max_tokens for the investigate "
-                    "role or route it to a non-reasoning model"
+                    "producing a complete answer; raise max_tokens for the "
+                    "investigate role or route it to a non-reasoning model"
                 )
                 return result
             # Record the malformed turn. Without this a run that never parses
