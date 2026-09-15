@@ -541,6 +541,9 @@ def _to_evidence(
                     encoding=match.get("encoding"),
                     entropy=match.get("entropy"),
                     context_snippet=match.get("context"),
+                    context_plaintext=(
+                        match.get("context_plaintext") if run.retain_plaintext else None
+                    ),
                 )
             )
     return rows

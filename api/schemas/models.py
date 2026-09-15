@@ -194,6 +194,8 @@ class FindingOut(BaseModel):
     # this is not a new exposure surface: it is the retrieval path for values
     # that were already in the database with no other way to read them back.
     value_plaintexts: list[str] = Field(default_factory=list)
+    # `context_snippet` with nothing masked, under the same retention rule.
+    context_plaintext: str | None = None
 
     # Advisory. Null when triage has not run, and hidden entirely by the
     # dashboard's deterministic-view toggle.

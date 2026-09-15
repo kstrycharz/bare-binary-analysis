@@ -283,6 +283,9 @@ class Evidence(Base, TimestampMixin):
     strings is one most scanners miss."""
     entropy: Mapped[float | None] = mapped_column(Float)
     context_snippet: Mapped[str | None] = mapped_column(Text)
+    context_plaintext: Mapped[str | None] = mapped_column(Text)
+    """``context_snippet`` unmasked. Same retention rule as ``value_plaintext``,
+    and never what the LLM layer reads — prompts use ``context_snippet``."""
     extra: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 

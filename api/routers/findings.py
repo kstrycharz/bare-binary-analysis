@@ -205,6 +205,36 @@ def _plaintexts(session: Session, finding: Finding, locations: list[FindingLocat
     return sorted(values)
 
 
+def _context_plaintext(
+    session: Session, finding: Finding, locations: list[FindingLocation]
+) -> str | None:
+    """The unmasked counterpart of ``finding.context_snippet``, when retained.
+
+    The correlator copies one member's masked snippet onto the finding, so the
+    right evidence row is the one at this finding's locations whose masked
+    snippet is that same text. Falls back to the first retained row at those
+    locations if none matches exactly.
+    """
+    if not locations or not finding.context_snippet:
+        return None
+
+    keys = {(location.artifact_id, location.offset) for location in locations}
+    rows = session.scalars(
+        select(Evidence)
+        .where(
+            Evidence.run_id == finding.run_id,
+            Evidence.artifact_id.in_({artifact_id for artifact_id, _ in keys}),
+            Evidence.context_plaintext.is_not(None),
+        )
+        .order_by(Evidence.artifact_id, Evidence.offset)
+    ).all()
+    candidates = [row for row in rows if (row.artifact_id, row.offset) in keys]
+    for row in candidates:
+        if row.context_snippet == finding.context_snippet:
+            return row.context_plaintext
+    return candidates[0].context_plaintext if candidates else None
+
+
 def _to_out(session: Session, finding: Finding, previous_ids: set[str]) -> FindingOut:
     locations = list(
         session.scalars(
@@ -248,6 +278,7 @@ def _to_out(session: Session, finding: Finding, previous_ids: set[str]) -> Findi
         location_count=len(locations),
         llm=assessment,
         value_plaintexts=value_plaintexts,
+        context_plaintext=_context_plaintext(session, finding, locations),
         llm_explanation=finding.llm_explanation,
         llm_explained_by=finding.llm_explained_by,
         llm_explained_at=finding.llm_explained_at,

@@ -14,7 +14,7 @@
  * answer it is to show them.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import type {
   ExplainResponse,
   Finding,
@@ -286,9 +286,10 @@ export function FindingsExplorer({
                 const open = expanded === finding.id;
                 const primary = finding.locations[0];
                 return (
-                  <>
+                  // The key belongs on the fragment: it is the list item. A key
+                  // on the <tr> inside a bare <> does not count.
+                  <Fragment key={finding.id}>
                     <tr
-                      key={finding.id}
                       onClick={() => {
                         setCursor(index);
                         setExpanded(open ? null : finding.id);
@@ -347,7 +348,7 @@ export function FindingsExplorer({
                     </tr>
 
                     {open && (
-                      <tr key={`${finding.id}-detail`} className="border-b border-border">
+                      <tr className="border-b border-border">
                         <td colSpan={deterministicOnly ? 5 : 6} className="bg-surface-sunken px-4 py-4">
                           <FindingDetail
                             finding={finding}
@@ -357,7 +358,7 @@ export function FindingsExplorer({
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -416,14 +417,7 @@ function FindingDetail({
           </ul>
         </div>
 
-        {finding.context_snippet && (
-          <div>
-            <Label>Context — value masked</Label>
-            <pre className="mt-1 scroll-x rounded border border-border bg-surface p-2 font-mono text-xs">
-              {finding.context_snippet}
-            </pre>
-          </div>
-        )}
+        {finding.context_snippet && <ContextSnippet finding={finding} />}
 
         {!deterministicOnly && finding.llm && (
           <div className="rounded border border-accent/30 bg-accent-muted/40 p-3">
@@ -747,6 +741,42 @@ function SecretValue({ finding }: { finding: Finding }) {
           ? "This run retained plaintext, so the real values are stored in the database and shown here on request."
           : "Only a masked value and a hash were stored. To see the real value, re-scan this artifact with “Retain full plaintext values” selected."}
       </p>
+    </div>
+  );
+}
+
+/**
+ * The bytes around the hit. Masked by default; when the run retained
+ * plaintext, click-to-reveal for the same reason as the value above.
+ */
+function ContextSnippet({ finding }: { finding: Finding }) {
+  const [revealed, setRevealed] = useState(false);
+  const plaintext = finding.context_plaintext;
+  const showing = revealed && plaintext != null;
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <Label>Context — {showing ? "plaintext" : "value masked"}</Label>
+        {plaintext != null && (
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              setRevealed((on) => !on);
+            }}
+            className="!px-2 !py-0.5 !text-xs"
+          >
+            {revealed ? "Hide" : "Reveal"}
+          </Button>
+        )}
+      </div>
+      <pre
+        className={`mt-1 scroll-x rounded border p-2 font-mono text-xs ${
+          showing ? "border-critical/40 bg-critical-bg text-critical" : "border-border bg-surface"
+        }`}
+      >
+        {showing ? plaintext : finding.context_snippet}
+      </pre>
     </div>
   );
 }
