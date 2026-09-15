@@ -21,7 +21,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from api.routers.findings import _plaintexts
+from api.routers.findings import _context_plaintext, _plaintexts
 from core.models import Artifact, Evidence, Finding, FindingLocation, Run
 from core.models.base import Base
 from core.models.enums import ArtifactKind, RunStatus
@@ -171,3 +171,39 @@ class TestRunsWithoutRetention:
         finding = _finding(session, value_hash="h", offsets=[])
 
         assert _plaintexts(session, finding, []) == []
+
+
+class TestContextPlaintext:
+    def _context(self, session: Session, offset: int, masked: str, raw: str | None) -> None:
+        session.add(
+            Evidence(
+                run_id="r1",
+                artifact_id="a1",
+                analyzer="static",
+                rule_id="windows-source-file-path",
+                value_hash=f"{offset:064d}",
+                value_masked="masked",
+                offset=offset,
+                context_snippet=masked,
+                context_plaintext=raw,
+            )
+        )
+
+    def test_the_unmasked_window_pairs_with_the_findings_snippet(self, session: Session) -> None:
+        """A cluster has many members; the snippet on the finding is one of
+        theirs, and the reveal must show that same window, not a neighbour's."""
+        _run(session)
+        self._context(session, 100, "a=Z:\\r••••.cpp", "a=" + REAL[0])
+        self._context(session, 101, "b=Z:\\r••••.cpp", "b=" + REAL[1])
+        finding = _finding(session, value_hash="h", offsets=[100, 101])
+        finding.context_snippet = "b=Z:\\r••••.cpp"
+
+        assert _context_plaintext(session, finding, list(finding.locations)) == "b=" + REAL[1]
+
+    def test_nothing_when_the_run_did_not_retain_it(self, session: Session) -> None:
+        _run(session)
+        self._context(session, 100, "a=Z:\\r••••.cpp", None)
+        finding = _finding(session, value_hash="h", offsets=[100])
+        finding.context_snippet = "a=Z:\\r••••.cpp"
+
+        assert _context_plaintext(session, finding, list(finding.locations)) is None

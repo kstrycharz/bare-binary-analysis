@@ -255,6 +255,7 @@ def scan_one(job: tuple[str, int, bool]) -> dict[str, Any]:
                 "encoding": m.encoding,
                 "entropy": m.entropy,
                 "context": m.context,
+                **({"context_plaintext": m.context_plaintext} if include_plaintext else {}),
             }
             for m in matches
         ],

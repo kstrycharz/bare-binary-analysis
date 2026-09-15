@@ -188,6 +188,15 @@ class TestScanning:
         for match in scan_bytes(data, pack):
             assert secret not in match.context
 
+    def test_plaintext_context_is_the_same_window_unmasked(self, pack: RulePack) -> None:
+        """Only emitted under plaintext retention; it must be the masked window
+        with the value put back, not a different slice of the file."""
+        secret = "AKIA2E0A8F3B5C7D9E1F"
+        data = f"config: aws_key={secret} region=us-east-1".encode()
+        match = next(m for m in scan_bytes(data, pack) if m.rule_id == "aws-access-key-id")
+        assert secret in match.context_plaintext
+        assert match.context_plaintext.replace(secret, mask(secret)) == match.context
+
 
 class TestMasking:
     def test_masking_keeps_the_shape_not_the_secret(self) -> None:

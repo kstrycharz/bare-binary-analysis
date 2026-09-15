@@ -54,6 +54,9 @@ class Match:
     encoding: str
     entropy: float
     context: str
+    context_plaintext: str = ""
+    """The same window as ``context`` with nothing masked. Leaves the analyzer
+    only under ``--include-plaintext``; never sent to a model."""
 
     @property
     def value_hash(self) -> str:
@@ -143,17 +146,21 @@ def extract_strings(data: bytes, min_length: int = MIN_STRING_LENGTH) -> list[Ex
     return results
 
 
+def _raw_context_for(data: bytes, offset: int, value: str) -> str:
+    """Bytes around the hit, printable, with nothing masked."""
+    start = max(0, offset - CONTEXT_BYTES)
+    end = min(len(data), offset + len(value) * 2 + CONTEXT_BYTES)
+    window = data[start:end].decode("ascii", "replace")
+    return "".join(c if c.isprintable() or c == " " else "." for c in window)
+
+
 def _context_for(data: bytes, offset: int, value: str) -> str:
     """Bytes around the hit, with the secret itself masked out.
 
     This is what gets sent to a remote model, so the value must not survive in
     it — the trust boundary depends on this function being correct.
     """
-    start = max(0, offset - CONTEXT_BYTES)
-    end = min(len(data), offset + len(value) * 2 + CONTEXT_BYTES)
-    window = data[start:end].decode("ascii", "replace")
-    window = "".join(c if c.isprintable() or c == " " else "." for c in window)
-    return window.replace(value, mask(value))
+    return _raw_context_for(data, offset, value).replace(value, mask(value))
 
 
 def scan_bytes(
@@ -232,6 +239,7 @@ def _apply_rule(
                 encoding=extracted.encoding,
                 entropy=round(shannon_entropy(value), 3),
                 context=_context_for(data, absolute, value),
+                context_plaintext=_raw_context_for(data, absolute, value),
             )
 
 

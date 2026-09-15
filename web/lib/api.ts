@@ -142,6 +142,8 @@ export interface Finding {
   /** Empty unless the run opted into plaintext retention. A clustered finding
    *  covers many distinct values, so this is a list rather than one string. */
   value_plaintexts: string[];
+  /** `context_snippet` with nothing masked. Null unless the run retained plaintext. */
+  context_plaintext: string | null;
   /** From the `explain` role; null until someone asks for it. */
   llm_explanation: string | null;
   llm_explained_by: string | null;
