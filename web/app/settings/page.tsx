@@ -1,6 +1,7 @@
 import { api, type LlmSettings } from "@/lib/api";
 import { ErrorNotice, Mono, Panel } from "@/components/ui";
 import { LlmControls } from "@/components/llm-controls";
+import { AddProviderPanel } from "@/components/connect-provider";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,11 @@ export default async function SettingsPage() {
       {error && <ErrorNotice title="Could not load LLM settings" detail={error} />}
 
       {settings && <LlmControls settings={settings} />}
+
+      {/* Always offered, including when the wizard's model step was skipped
+          and AI assistance is off: connecting a provider is how it gets
+          switched on. */}
+      {settings && <AddProviderPanel hasProviders={settings.providers.length > 0} />}
 
       {settings && (
         <>

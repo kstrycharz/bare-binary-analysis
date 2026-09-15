@@ -126,8 +126,8 @@ export function LlmControls({ settings }: { settings: LlmSettings }) {
             <p className="text-[13px] font-medium">No reachable provider</p>
             <p className="mt-1.5 max-w-xl text-[12px] leading-relaxed text-content-subtle">
               {settings.providers.length === 0
-                ? "No provider is configured yet. Use the setup wizard on the " +
-                  "first run, or add one on this page once the stack can reach it."
+                ? "No provider is configured yet. Add one below — it is tested " +
+                  "before anything is saved."
                 : "Every configured provider failed its live probe. The findings " +
                   "and verdicts below them are deterministic and unchanged; see " +
                   "each provider's detail line in the Providers panel."}
