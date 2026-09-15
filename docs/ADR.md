@@ -909,3 +909,92 @@ Redis, and any missed one is a frozen tab with no way to notice. A two-second
 fingerprint poll cannot miss, because it reads the truth rather than trusting
 someone to have announced it. The cost the rejected poll had (per-row work) is
 exactly what this design removes.
+
+## ADR-0033 — A running stage's log is published as it grows, through the retained log's own path
+
+**Date:** 2026-09-14
+**Status:** Accepted
+
+### Context
+
+ADR-0032 keeps each stage's output, but only once its container exits; until
+then the bytes live in a container the worker is waiting on. The questions
+asked while debugging a scan are asked *during* it — is unpack hung or
+grinding through 69 000 files, what did static print before it began to time
+out — and the progress panel could only answer "the stage is running".
+`docker logs` on the worker host answers it, for someone with a shell there
+and no redaction in the way.
+
+### Decision
+
+**The driver offers output while it waits.** `SandboxDriver.run` takes an
+optional `on_output` callback. `DockerDriver` slices its deadline wait into
+two-second waits and, between slices, hands the callback everything the
+container has printed so far, capped as the final result is. Slices end on the
+monotonic deadline rather than by count, so a slow callback shortens what is
+left of the wait instead of extending the watchdog's patience. A callback that
+raises is logged and ignored: a broken live view does not degrade a stage
+(ADR-0008).
+
+**The pipeline publishes it through the retained log's renderer, to the
+retained log's key.** `LiveStageLog` renders with `render_stage_log(live=True)`
+and writes `logs/{run_id}/{stage_id}.txt`, which `store_stage_log` overwrites
+when the stage ends. One address, one renderer, one redaction pass: a snapshot
+and the retained log cannot disagree about how a line is masked. `live=True`
+differs in one respect — each stream's unfinished last line is held back,
+because a process caught mid-write has printed half a key, and half a key is
+not something any rule recognises. One line is enough because matching never
+crosses a newline: the extractor splits strings there, and proximity rules
+look inside the extracted string.
+
+**Throttled on cost, not only on time.** A snapshot is a rule-pack pass over
+everything printed so far, up to about 5 s at the driver's 8 MiB cap.
+Snapshots are at least `BARE_LIVE_LOG_INTERVAL_S` apart (default 5) and at
+least four times the last snapshot's cost apart; output that has not grown is
+not re-rendered, and an identical document is not rewritten. `0` turns live
+snapshots off.
+
+**No row writes mid-stage.** `log_key` keeps meaning "this finished stage
+retained its log". For a PENDING or RUNNING stage the endpoint reads the
+deterministic key and labels the response `X-Bare-Log-State: live` — or
+`partial` when the run is already terminal and nothing will add to it. A
+*finished* stage with no `log_key` is still a 404: a snapshot left behind by a
+failed retained write is not promoted to a log.
+
+**Same gate as the retained log.** ADMIN scope, `text/plain`,
+`default-src 'none'; sandbox`. The dashboard polls it every three seconds
+behind a "Show logs" toggle on the progress panel, off by default.
+`bare scan --show-logs` prints new lines on each status poll with every
+control character escaped; a CI-scoped token gets one warning and no logs.
+
+### The limit, stated
+
+A snapshot's masking is exactly as good as what has been printed so far.
+Redaction replaces every occurrence of a matched value, so a value a rule can
+identify only from context on a *later* line is masked in the retained log and
+in every snapshot after that line, but not in a snapshot taken before it, nor
+in lines `--show-logs` has already printed. The exposure is one value, repeated
+in an analyzer's output, first without its context, seen by an admin while the
+scan runs. Withholding output until the stage ends would close it, and would
+also remove the feature.
+
+### Alternatives rejected
+
+**Streaming `docker logs --follow` through the API.** The API would need the
+Docker socket, which is the worker's privilege and no one else's, and each
+consumer would redact on its own.
+
+**Deltas instead of whole documents.** Cheaper per tick, but a delta's
+redaction cannot see a value that straddles two deltas, and every reader has
+to reassemble state. A whole document rewritten at one key is idempotent for
+readers and cannot drift from the retained log.
+
+**Committing `log_key` with the first snapshot.** The scan is one long
+transaction committed at phase boundaries (`_checkpoint`); a commit from inside
+the driver's wait is a hidden checkpoint, and `log_key` would stop telling a
+retained log from a snapshot.
+
+**Pushing log text over the progress SSE stream.** That stream already reads
+the database every two seconds for every open panel. Adding a bucket read per
+stage per tick, whether or not anyone opened the logs, is the bulk read
+`StageLogDisclosure` was written to avoid.

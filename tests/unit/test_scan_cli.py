@@ -70,8 +70,29 @@ class _StubHandler(BaseHTTPRequestHandler):
         if self.path.endswith("/sarif"):
             self._respond(200, {"version": "2.1.0", "runs": []})
             return
+        if self.path.endswith("/logs"):
+            logs = STATE.get("logs")
+            if not isinstance(logs, dict) or self.path not in logs:
+                self._respond(404, {"detail": "no output yet"})
+                return
+            code, text, state = logs[self.path]
+            body = text.encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("X-Bare-Log-State", state)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path.startswith("/api/runs/"):
-            self._respond(200, {"id": "run-1", "status": STATE.get("run_status", "completed")})
+            self._respond(
+                200,
+                {
+                    "id": "run-1",
+                    "status": STATE.get("run_status", "completed"),
+                    "stages": STATE.get("stages", []),
+                },
+            )
             return
         self._respond(404, {"detail": "not found"})
 
@@ -322,6 +343,42 @@ def test_writes_json_sarif_and_markdown(artifact: Path, server: str, tmp_path: P
 
     assert json.loads((out / "scan.sarif").read_text(encoding="utf-8"))["version"] == "2.1.0"
     assert "BARE release gate" in (out / "summary.md").read_text(encoding="utf-8")
+
+
+def test_show_logs_prints_each_stage_labelled_and_still_gates(artifact: Path, server: str) -> None:
+    STATE["stages"] = [{"id": "st-1", "analyzer": "static", "status": "completed"}]
+    STATE["logs"] = {
+        "/api/runs/run-1/stages/st-1/logs": (
+            200,
+            "--- stdout ---\nscanned 3 files\n\n--- stderr ---\n",
+            "final",
+        )
+    }
+    result = _invoke(artifact, server, "--show-logs")
+    assert result.exit_code == 0
+    assert "[static] completed" in result.stdout
+    assert "[static:stdout] scanned 3 files" in result.stdout
+    assert "PASS" in result.stdout
+
+
+def test_logs_are_not_read_without_the_flag(artifact: Path, server: str) -> None:
+    STATE["stages"] = [{"id": "st-1", "analyzer": "static", "status": "completed"}]
+    STATE["logs"] = {"/api/runs/run-1/stages/st-1/logs": (200, "--- stdout ---\nx\n", "final")}
+    result = _invoke(artifact, server)
+    assert "[static" not in result.stdout
+
+
+def test_show_logs_with_a_ci_token_warns_and_the_gate_still_decides(
+    artifact: Path, server: str
+) -> None:
+    """Logs are admin-scoped; a pipeline asking for them must not fail over it."""
+    STATE["stages"] = [{"id": "st-1", "analyzer": "static", "status": "completed"}]
+    STATE["logs"] = {
+        "/api/runs/run-1/stages/st-1/logs": (403, '{"detail": "admin scope required"}', "")
+    }
+    result = _invoke(artifact, server, "--show-logs")
+    assert result.exit_code == 0
+    assert "admin-scoped token" in result.output
 
 
 def test_waits_for_a_running_scan_before_gating(artifact: Path, server: str) -> None:

@@ -95,6 +95,17 @@ class Settings(BaseSettings):
     routinely scan large Electron or firmware trees — a 213 MB installer
     unpacks to ~69 000 files, which is the shape that pushes against it."""
 
+    live_log_interval_s: float = 5.0
+    """Floor, in seconds, between two published snapshots of a running stage's
+    output — what the dashboard's "Show logs" and `bare scan --show-logs` read
+    while a scan is in flight (ADR-0033).
+
+    Each snapshot is a rule-pack redaction pass over everything the stage has
+    printed so far, and the real interval stretches with that cost, so a quiet
+    analyzer is near real time and a chatty one is not slowed by being watched.
+    ``0`` turns live snapshots off; the log retained when a stage ends is
+    unaffected."""
+
     reaper_max_age_hours: int = 6
     reaper_interval_seconds: int = 300
 

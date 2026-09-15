@@ -31,7 +31,7 @@ from core.models import Artifact, Evidence, Run, RunManifest, RunStage, Suppress
 from core.models.base import new_uuid
 from core.models.enums import RunStatus, StageStatus
 from core.pipeline.correlator import correlate
-from core.pipeline.logs import redact_log_text, store_stage_log
+from core.pipeline.logs import LiveStageLog, redact_log_text, store_stage_log
 from core.pipeline.stages import degraded_stages, describe_degraded
 from core.rules import load_rule_pack
 from core.rules.model import RulePack
@@ -329,7 +329,8 @@ def _run_unpack(
                     BindMount(str(staging), INPUT_DIR, MountMode.READ_ONLY),
                     BindMount(str(results), OUTPUT_DIR, MountMode.READ_WRITE),
                 ),
-            )
+            ),
+            on_output=_live_log(stage, pack),
         )
     finally:
         driver.close()
@@ -399,7 +400,8 @@ def _run_static(
                     BindMount(str(rules_dir), RULES_MOUNT, MountMode.READ_ONLY),
                     BindMount(str(results), OUTPUT_DIR, MountMode.READ_WRITE),
                 ),
-            )
+            ),
+            on_output=_live_log(stage, pack),
         )
     finally:
         driver.close()
@@ -408,6 +410,25 @@ def _run_static(
     payload = _read_result(results) or {}
     stage.evidence_count = sum(len(f.get("matches", [])) for f in payload.get("files", []))
     return result, payload
+
+
+def _live_log(stage: RunStage, pack: RulePack) -> LiveStageLog | None:
+    """What the running stage has printed, published while its container works.
+
+    The stage row is committed before the container starts, so its id is an
+    address a reader already has; nothing further is written to the row until
+    the stage ends (ADR-0033).
+    """
+    interval_s = get_settings().live_log_interval_s
+    if interval_s <= 0:
+        return None
+    return LiveStageLog(
+        get_object_store(),
+        run_id=stage.run_id,
+        stage_id=stage.id,
+        pack=pack,
+        interval_s=interval_s,
+    )
 
 
 # --- tree -----------------------------------------------------------------

@@ -28,6 +28,7 @@ import typer
 
 from cli.client import ApiError, BareClient
 from cli.gate_output import render_json, render_markdown, render_text
+from cli.log_follow import LogFollower
 from core.policy import (
     POLICY_DIR,
     POLICY_FILE,
@@ -163,6 +164,17 @@ def scan(
     llm: Annotated[bool, typer.Option("--llm/--no-llm", help="Enable AI triage.")] = False,
     timeout: Annotated[int, typer.Option(help="Seconds to wait for the scan.")] = 1800,
     poll_interval: Annotated[float, typer.Option(help="Seconds between status polls.")] = 5.0,
+    show_logs: Annotated[
+        bool,
+        typer.Option(
+            "--show-logs",
+            help=(
+                "Print analyzer output while the scan runs, for debugging. Needs an admin "
+                "token. The text is redacted, but it is derived from the artifact: keep it "
+                "out of job logs other people can read."
+            ),
+        ),
+    ] = False,
     sarif: Annotated[Path | None, typer.Option(help="Write SARIF here for code scanning.")] = None,
     pdf: Annotated[Path | None, typer.Option(help="Write the PDF release record here.")] = None,
     sbom: Annotated[Path | None, typer.Option(help="Write a CycloneDX SBOM here.")] = None,
@@ -236,19 +248,37 @@ def scan(
 
     # --- wait ------------------------------------------------------------
     seen: set[str] = set()
+    follower = (
+        LogFollower(
+            client,
+            handle.run_id,
+            echo=typer.echo,
+            warn=lambda message: typer.secho(
+                f"warning: {message}", fg=typer.colors.YELLOW, err=True
+            ),
+        )
+        if show_logs
+        else None
+    )
 
     def _progress(run: dict[str, object]) -> None:
         status = str(run.get("status", ""))
         if status not in seen:
             seen.add(status)
             typer.echo(f"  status: {status}")
+        if follower is not None:
+            follower.poll(run)
 
     try:
-        client.wait_for_run(
+        finished = client.wait_for_run(
             handle.run_id, timeout_s=timeout, poll_interval_s=poll_interval, on_poll=_progress
         )
     except ApiError as exc:
         _fail(str(exc))
+    if follower is not None:
+        # `wait_for_run` returns on the terminal poll without calling back, and
+        # that poll is the one where every stage's retained log can be read.
+        follower.poll(finished)
 
     # --- gate ------------------------------------------------------------
     try:
