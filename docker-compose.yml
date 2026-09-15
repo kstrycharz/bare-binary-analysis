@@ -54,6 +54,11 @@ x-backend-env: &backend-env
   BARE_ANALYZER_MEMORY_GB: ${BARE_ANALYZER_MEMORY_GB:-8}
   # Seconds between redacted snapshots of a running stage's output (ADR-0033).
   BARE_LIVE_LOG_INTERVAL_S: ${BARE_LIVE_LOG_INTERVAL_S:-5}
+  # S4: once a scan finishes, Ghidra names the function that references each
+  # flagged string. Enrichment only — it cannot change a finding or a gate
+  # verdict (ADR-0034). The JVM heap inside the container is 60% of the memory.
+  BARE_GHIDRA_ENABLED: ${BARE_GHIDRA_ENABLED:-true}
+  BARE_GHIDRA_MEMORY_GB: ${BARE_GHIDRA_MEMORY_GB:-4}
 
 services:
   postgres:
@@ -188,6 +193,20 @@ services:
     entrypoint: ["/bin/true"]
     restart: "no"
 
+  # The first build downloads the pinned Ghidra release (569 MB) from the NSA's
+  # own GitHub releases and checks its SHA-256 before unpacking; later builds
+  # are cached. Nothing of Ghidra is in this repository (NOTICE.md there). An
+  # air-gapped build points it at an internal mirror, digest check unchanged:
+  #   docker compose build --build-arg GHIDRA_URL=https://mirror/... analyzer-ghidra
+  analyzer-ghidra:
+    build:
+      context: .
+      dockerfile: sandbox/images/ghidra/Dockerfile
+    image: bare/ghidra:${BARE_ANALYZER_TAG:-dev}
+    pull_policy: build
+    entrypoint: ["/bin/true"]
+    restart: "no"
+
   api:
     build:
       context: .
@@ -262,6 +281,8 @@ services:
         condition: service_completed_successfully
       analyzer-unpack:
         condition: service_completed_successfully
+      analyzer-ghidra:
+        condition: service_completed_successfully
       # Only the API migrates (api/main.py's lifespan calls upgrade_schema).
       # Uvicorn does not serve until that has finished, so a passing /healthz
       # is the signal that the schema exists. Without this edge a worker can be
@@ -311,6 +332,9 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
+      # This lane is the one that spawns bare/ghidra.
+      analyzer-ghidra:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-m", "core.orchestrator.health"]
       interval: 30s

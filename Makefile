@@ -79,7 +79,7 @@ override BARE_ANALYZER_TAG := $(or $(strip $(BARE_ANALYZER_TAG)),dev)
 BUILD_ANALYZER := BARE_ANALYZER_TAG=$(BARE_ANALYZER_TAG) $(COMPOSE) build
 
 .PHONY: images
-images: image-hello image-static image-unpack ## Build every analyzer image
+images: image-hello image-static image-unpack image-ghidra ## Build every analyzer image
 
 .PHONY: image-hello
 image-hello: ## Build the reference analyzer / isolation probe image
@@ -92,6 +92,10 @@ image-static: ## Build the static scan analyzer (strings, rules, entropy)
 .PHONY: image-unpack
 image-unpack: ## Build the recursive unpack analyzer
 	$(BUILD_ANALYZER) analyzer-unpack
+
+.PHONY: image-ghidra
+image-ghidra: ## Build the Ghidra cross-reference analyzer (downloads 569 MB, verified)
+	$(BUILD_ANALYZER) analyzer-ghidra
 
 .PHONY: refresh-digests
 refresh-digests: ## Print current digests for the pinned base images

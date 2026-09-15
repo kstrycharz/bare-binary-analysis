@@ -17,8 +17,8 @@ Three jobs, all of which exist because the image build alone cannot do them:
 ``--output DIR``
     Download the pinned archive and verify it. This is the air-gap path: fetch
     on a connected machine, carry the archive in, and build with
-    ``--build-arg GHIDRA_ARCHIVE_URL=file:///...``. Also what CI warms, so a
-    build does not re-download 569 MB per job.
+    ``--build-arg GHIDRA_URL=https://mirror.internal/...``, served from an
+    internal mirror the build can reach. The digest check still runs.
 
 ``--verify FILE``
     Check an archive somebody else handed you against the pin. An operator who

@@ -5,7 +5,7 @@
 # a package manager consumes a release: by pinned version, from the vendor's
 # own URL, verified against the SHA-256 the vendor published in the release
 # notes. Nothing of Ghidra is committed to this repository — `git ls-files`
-# holds a URL and a digest. See sandbox/images/ghidra/NOTICE.md and ADR-0031.
+# holds a URL and a digest. See sandbox/images/ghidra/NOTICE.md and ADR-0034.
 #
 # The ARG defaults below are duplicated in ghidra.lock.json, which is the file
 # a human edits to bump. tests/unit/test_ghidra_pin.py fails if they disagree,
@@ -56,6 +56,13 @@ RUN set -eu; \
 # as upstream wrote it, which is a condition of using it at all.
 RUN rm -rf /opt/ghidra/docs /opt/ghidra/GhidraDocs /opt/ghidra/Extensions/Eclipse
 
+# The whole Ghidra tree is read-only, which is both a hardening measure and the
+# honest statement: BARE runs Ghidra as shipped and cannot have modified it.
+# Done here, before the COPY into the final stage, and not after it: a chmod in
+# the final stage rewrites every file's metadata into a new layer, which stored
+# a second full copy of Ghidra and took the image from 2.0 GB to 3.3 GB.
+RUN chmod -R a-w /opt/ghidra
+
 # ---------------------------------------------------------------------------
 FROM eclipse-temurin@sha256:2fc8306f51cd8c1582b972213f3115300074084ec4f9060448454f04ecbd941b
 
@@ -68,8 +75,13 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 \
  && rm -rf /var/lib/apt/lists/*
 
+# Home is /work, and it has to be set here rather than only through $HOME: the
+# JVM takes `user.home` from the passwd entry, and Ghidra refuses to start when
+# that directory does not exist ("User home directory does not exist:
+# /home/analyzer"). /work is the tmpfs the sandbox mounts writable.
 RUN groupadd --gid 10001 analyzer \
- && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin analyzer \
+ && useradd --uid 10001 --gid 10001 --home-dir /work --no-create-home \
+      --shell /usr/sbin/nologin analyzer \
  && mkdir -p /input /output /work /scripts
 
 COPY --from=fetch --chown=root:root /opt/ghidra /opt/ghidra
@@ -82,9 +94,8 @@ COPY --chown=root:root sandbox/ghidra_scripts/ /scripts/
 COPY --chown=root:root sandbox/images/ghidra/analyzer.py /opt/bare/analyzer.py
 COPY --chown=root:root sandbox/images/ghidra/NOTICE.md   /opt/ghidra/BARE-NOTICE.md
 
-# The whole Ghidra tree is read-only, which is both a hardening measure and the
-# honest statement: BARE runs Ghidra as shipped and cannot have modified it.
-RUN chmod -R a-w /opt/ghidra /opt/bare /scripts
+# BARE's own few files, read-only like the Ghidra tree above.
+RUN chmod -R a-w /opt/bare /scripts
 
 USER 10001:10001
 WORKDIR /work
@@ -97,7 +108,7 @@ ENV HOME=/work \
     TMPDIR=/work \
     GHIDRA_HOME=/opt/ghidra \
     BARE_GHIDRA_VERSION=${GHIDRA_VERSION} \
-    JAVA_TOOL_OPTIONS="-Djava.io.tmpdir=/work -Djna.tmpdir=/work" \
+    JAVA_TOOL_OPTIONS="-Duser.home=/work -Djava.io.tmpdir=/work -Djna.tmpdir=/work" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONHASHSEED=0

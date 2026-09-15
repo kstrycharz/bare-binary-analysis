@@ -80,15 +80,16 @@ $Targets = [ordered]@{
     'clean'            = { Invoke-Docker ($ComposeDev + @('down', '--remove-orphans', '--volumes')) }
     'logs'             = { Invoke-Docker ($ComposeDev + @('logs', '-f')) }
 
-    'images'           = { & $PSCommandPath 'image-hello'; & $PSCommandPath 'image-static'; & $PSCommandPath 'image-unpack' }
+    'images'           = { & $PSCommandPath 'image-hello'; & $PSCommandPath 'image-static'; & $PSCommandPath 'image-unpack'; & $PSCommandPath 'image-ghidra' }
     # Delegated to Compose so each analyzer's build context and dockerfile are
-    # defined in docker-compose.yml only; `docker compose up` builds all three.
+    # defined in docker-compose.yml only; `docker compose up` builds all four.
     # The tag is passed through rather than baked into a -t, so Compose's
     # ${BARE_ANALYZER_TAG:-dev} resolves to the same value Get-AnalyzerTag
     # would have produced.
     'image-hello'      = { Build-Analyzer 'analyzer-hello' }
     'image-static'     = { Build-Analyzer 'analyzer-static' }
     'image-unpack'     = { Build-Analyzer 'analyzer-unpack' }
+    'image-ghidra'     = { Build-Analyzer 'analyzer-ghidra' }
     'refresh-digests'  = {
         foreach ($image in @('python:3.12-slim-bookworm')) {
             Invoke-Docker @('pull', '-q', $image)

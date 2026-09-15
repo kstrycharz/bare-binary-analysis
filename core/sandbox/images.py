@@ -32,7 +32,7 @@ REGISTRY_NAMESPACE = "bare"
 # The analyzers this project builds. `make images` and the image-name helper
 # read the same list so a new analyzer cannot be added to one and forgotten in
 # the other.
-ANALYZERS = ("hello", "static", "unpack")
+ANALYZERS = ("hello", "static", "unpack", "ghidra")
 
 
 def analyzer_tag() -> str:

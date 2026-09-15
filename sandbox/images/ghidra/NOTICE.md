@@ -42,11 +42,12 @@ via `-scriptPath`. Those are ordinary Ghidra scripts using the public
 Ghidra is 569 MB and its analysis output changes between versions. A run
 manifest that says "Ghidra" without a version cannot be reproduced, so the
 version is pinned in `ghidra.lock.json`, recorded in every run manifest, and
-bumped deliberately. See ADR-0031.
+bumped deliberately. See ADR-0034.
 
 ## Attribution in output
 
-Every BARE report that contains a Ghidra-derived finding names Ghidra and its
-version as the source. Findings are attributed to the tool that produced them;
-the deterministic spine does not launder someone else's analysis into BARE's
-own voice.
+Ghidra produces no findings in BARE. It adds one thing to findings a
+deterministic rule already made: the name of the function that references the
+flagged string, shown as `in connect_broker()` beside the location. The run
+manifest records Ghidra's version and image digest alongside every other
+tool's, so it is always possible to say which Ghidra named a function.
