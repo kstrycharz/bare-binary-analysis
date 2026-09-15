@@ -418,7 +418,9 @@ release?* Finding IDs are derived from content, so that comparison is a set
 difference rather than a fuzzy match.
 
 **Run detail** — live per-analyzer progress over SSE while scanning, then the
-stage table, the run manifest, and the findings explorer.
+stage table, the run manifest, and the findings explorer. **Show logs** on the
+Scanning panel opens each analyzer's output as it is printed, a few seconds
+behind and redacted with the run's rule pack.
 
 The **run manifest** is worth a look. It records the artifact hash, rule-pack
 version and hash, analyzer image *digests* (not tags), and tool versions. Two
@@ -536,6 +538,20 @@ removed by hand rather than the whole stack. Recreate both together:
 docker compose down --volumes
 docker compose up --build -d
 ```
+
+### A scan looks stuck, or a stage degrades
+
+Open the run and press **Show logs** on the Scanning panel. Each analyzer's
+output appears as it is printed — enough to tell an unpack working through
+tens of thousands of files from one that is hung. From a terminal, with an
+admin token:
+
+```bash
+uv run bare scan dist/installer.exe --show-logs
+```
+
+Once a stage ends, the same text stays under **Log** in the stage table. The
+pipeline's own view of the scan is in `docker compose logs worker`.
 
 ### A worker crash-loops
 

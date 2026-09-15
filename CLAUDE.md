@@ -51,7 +51,8 @@ explains individual findings, investigates them agentically with read-only
 tools, and summarises a run. A release policy turns
 those findings into a ship / do-not-ship decision with a meaningful exit code,
 so BARE is a build-pipeline stage gate and not only a dashboard. Analyzer
-output is kept per stage, redacted at write time (ADR-0032); `bare waive` writes
+output is kept per stage, redacted at write time (ADR-0032), and readable while the stage is still
+running (ADR-0033); `bare waive` writes
 waivers the gate will honour, and `bare sbom-diff` compares two builds.
 
 Deployment is two commands and no file editing — the dashboard's first-run
@@ -145,6 +146,7 @@ Append-only; supersede rather than edit.
 - **ADR-0029** — The API is the only migrator, and everything else waits for it (2026-08-27)
 - **ADR-0030** — The packaged LLM config ships inert (2026-08-27)
 - **ADR-0031** — The Runs list refreshes on a fingerprint event, not on polling the list (2026-09-11)
+- **ADR-0033** — A running stage's log is published as it grows, through the retained log's own path (2026-09-14)
 
 ---
 
@@ -207,6 +209,7 @@ computation the gate already does, surfaced for a human rather than a pipeline.
 | Medium | Investigation quality tracks the model hard. On a local 14b the loop runs correctly — it searches, probes encodings, and terminates — but the conclusion is often generic ("review the file and ensure it does not contain sensitive information"). The mechanism is sound; the prose needs a better model or a larger `num_ctx`, and the default routing sends `investigate` to the fast model. |
 | Low | An investigation re-reads no earlier tool output once it falls outside `MAX_CONTEXT_TURNS`; the model is told steps were omitted but cannot get them back. Fine at 12 steps, wrong if the cap ever rises much. |
 | Medium | The `remediate` role is routable and described in the settings UI as not-yet-wired, but nothing calls it. Either wire it or drop it from `EDITABLE_ROLES`. |
+| Low | A live log snapshot masks what has been printed so far. A value a rule identifies only from a *later* line's context is masked in the retained log and in later snapshots, but not in earlier ones or in lines `bare scan --show-logs` already printed (ADR-0033). |
 | Low | `explain` and `summarize` have no cache: asking twice costs two calls. Triage caches by prompt hash within a pass; these do not, because they are user-initiated and low-volume. |
 | Low | Cloud provider adapters are unit-tested against their wire shapes but only OpenAI has been exercised against the live API (a deliberate 401). Anthropic and Google are untested end to end. |
 

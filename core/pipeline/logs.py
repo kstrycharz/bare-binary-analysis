@@ -21,10 +21,16 @@ with the same `mask()` the findings use. That holds whether or not the run
 opted into plaintext retention: the retention opt-in is a statement about
 *finding values the pipeline validated*, not about unbounded, unvalidated,
 untrusted analyzer stdout that happens to echo a customer's binary.
+
+A third, from ADR-0033: **while a stage runs, the same document is published
+as it grows** (`LiveStageLog`), through the same renderer and to the same key,
+so "show logs" during a scan reads exactly what the retained log will say.
 """
 
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import structlog
@@ -50,8 +56,22 @@ _STORED_TRUNCATION_NOTE = "\n[bare: stored log truncated]\n"
 
 _HEADLINE = "--- {stream} ---\n"
 
+# The floor between two published snapshots of a running stage. Each snapshot
+# is a rule-pack pass over everything the stage has printed so far, so the
+# real interval also stretches with that cost — see `LiveStageLog`.
+LIVE_LOG_INTERVAL_S = 5.0
+# A snapshot is not retaken sooner than this many times the last one's cost:
+# an analyzer printing megabytes spends most of its time analysing, not being
+# redacted.
+_LIVE_COST_MULTIPLE = 4.0
+# After a bucket failure, wait this long before trying again rather than
+# warning on every tick of a scan that may run for half an hour.
+_LIVE_FAILURE_BACKOFF_S = 30.0
 
-def render_stage_log(stdout: bytes, stderr: bytes, *, pack: RulePack) -> tuple[str, bool]:
+
+def render_stage_log(
+    stdout: bytes, stderr: bytes, *, pack: RulePack, live: bool = False
+) -> tuple[str, bool]:
     """The retained document, and whether either stream was cut to fit.
 
     Deterministic by construction: fixed section order, one pass of the rule
@@ -65,6 +85,15 @@ def render_stage_log(stdout: bytes, stderr: bytes, *, pack: RulePack) -> tuple[s
     this. Scanning the whole stream is bounded by the driver's own collection
     cap — about 5 s per stream at 8 MiB, against a scan measured in minutes —
     and cutting already-masked text can only ever shorten a mask.
+
+    ``live`` is for a container that is still running, and holds back each
+    stream's unfinished last line. It is the same hazard as the cap: a process
+    caught mid-``write`` has printed the first half of a key, which no rule
+    recognises. Holding back one line is enough because matching never crosses
+    one — the extractor splits strings at newlines, and proximity rules look
+    inside the extracted string — so a finished line redacts now exactly as
+    it will in the retained log. The held-back line appears whole in the next
+    snapshot.
     """
     truncated = False
     parts: list[str] = []
@@ -76,6 +105,8 @@ def render_stage_log(stdout: bytes, stderr: bytes, *, pack: RulePack) -> tuple[s
             truncated = True
             body = text[: -len(_DRIVER_TRUNCATION_MARKER)]
             text = _drop_partial_line(body) + _DRIVER_TRUNCATION_MARKER
+        elif live:
+            text = text[: text.rfind("\n") + 1]
         text = redact_log_text(text, pack=pack)
         encoded = text.encode("utf-8")
         if len(encoded) > MAX_STORED_LOG_BYTES:
@@ -159,6 +190,84 @@ def store_stage_log(
         log.warning("logs.store_failed", run_id=run_id, stage_id=stage_id, error=str(exc))
         return None, 0, False
     return key, len(data), truncated
+
+
+class LiveStageLog:
+    """Publishes a running stage's output where its retained log will go.
+
+    Handed to the sandbox driver as its ``on_output`` callback, which offers it
+    everything the container has printed so far every couple of seconds. A
+    snapshot is rendered by `render_stage_log` with ``live=True`` and written
+    to `stage_log_key` — the key `store_stage_log` overwrites when the stage
+    ends — so a reader polling one address sees the document grow and then
+    settle into the retained copy (ADR-0033). The stage row is not touched:
+    nothing is committed mid-stage, and ``log_key`` stays the statement that
+    a *finished* stage kept its log.
+
+    Throttled on two clocks: never more often than ``interval_s``, and never
+    more often than `_LIVE_COST_MULTIPLE` times the last snapshot's cost.
+    Output that has not grown is not re-rendered, and a document identical to
+    the last one is not rewritten.
+
+    Never raises: it runs on the thread enforcing the container's deadline,
+    and a broken live view must not turn a healthy analyzer into a degraded
+    stage (ADR-0008).
+    """
+
+    def __init__(
+        self,
+        store: ObjectStore,
+        *,
+        run_id: str,
+        stage_id: str,
+        pack: RulePack,
+        interval_s: float = LIVE_LOG_INTERVAL_S,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._store = store
+        self._run_id = run_id
+        self._stage_id = stage_id
+        self._pack = pack
+        self._interval_s = interval_s
+        self._clock = clock
+        self._next_at = float("-inf")
+        self._seen_bytes: int | None = None
+        self._published: str | None = None
+        self._bucket_ready = False
+
+    @property
+    def key(self) -> str:
+        return stage_log_key(self._run_id, self._stage_id)
+
+    def __call__(self, stdout: bytes, stderr: bytes) -> None:
+        started = self._clock()
+        if started < self._next_at:
+            return
+        size = len(stdout) + len(stderr)
+        if size == self._seen_bytes:
+            return
+        try:
+            document, _ = render_stage_log(stdout, stderr, pack=self._pack, live=True)
+            if document != self._published:
+                if not self._bucket_ready:
+                    self._store.ensure_bucket()
+                    self._bucket_ready = True
+                self._store.client.put_object(
+                    Bucket=self._store.bucket, Key=self.key, Body=document.encode("utf-8")
+                )
+                self._published = document
+        except Exception as exc:
+            log.warning(
+                "logs.live_store_failed",
+                run_id=self._run_id,
+                stage_id=self._stage_id,
+                error=str(exc),
+            )
+            self._next_at = self._clock() + _LIVE_FAILURE_BACKOFF_S
+            return
+        self._seen_bytes = size
+        finished = self._clock()
+        self._next_at = finished + max(self._interval_s, _LIVE_COST_MULTIPLE * (finished - started))
 
 
 def read_stage_log(store: ObjectStore, key: str) -> str:

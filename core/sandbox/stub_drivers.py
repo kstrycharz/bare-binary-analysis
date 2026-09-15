@@ -14,7 +14,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from core.sandbox.base import DriverHealth, ManagedContainer, SandboxDriver, SandboxResult
+from core.sandbox.base import (
+    DriverHealth,
+    ManagedContainer,
+    OutputCallback,
+    SandboxDriver,
+    SandboxResult,
+)
 from core.sandbox.spec import SandboxSpec
 
 
@@ -28,7 +34,7 @@ class _UnimplementedDriver(SandboxDriver):
             f"(scheduled for {self.milestone}); use the 'docker' driver"
         )
 
-    def run(self, spec: SandboxSpec) -> SandboxResult:
+    def run(self, spec: SandboxSpec, *, on_output: OutputCallback | None = None) -> SandboxResult:
         return self._fail()
 
     def health(self) -> DriverHealth:

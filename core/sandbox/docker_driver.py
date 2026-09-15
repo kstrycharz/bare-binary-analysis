@@ -17,9 +17,10 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
@@ -28,6 +29,7 @@ import structlog
 from core.sandbox.base import (
     DriverHealth,
     ManagedContainer,
+    OutputCallback,
     SandboxDriver,
     SandboxResult,
     SandboxStatus,
@@ -40,6 +42,11 @@ log = structlog.get_logger(__name__)
 MANAGED_LABEL = "bare.managed"
 _MAX_LOG_BYTES = 8 * 1024 * 1024
 
+# How often a running container's output is offered to an `on_output`
+# consumer. The consumer throttles itself (ADR-0033); this only bounds how
+# stale its view can get.
+_OUTPUT_POLL_S = 2.0
+
 
 class DockerUnavailable(RuntimeError):  # noqa: N818 - reads as a state, not an error type
     """The Docker daemon could not be reached or is misconfigured."""
@@ -50,8 +57,28 @@ class _ContainerHandle:
     """Adapts a docker-py container to the watchdog's ``ContainerHandle``."""
 
     container: Any
+    on_tick: Callable[[], None] | None = None
+    """Called between wait slices while the container runs; see `wait`."""
+    tick_s: float = _OUTPUT_POLL_S
 
     def wait(self, timeout_s: float) -> int | None:
+        if self.on_tick is None:
+            return self._wait_once(timeout_s)
+        # Sliced, so the output can be offered between slices. The watchdog's
+        # deadline still holds: slices end on the monotonic clock rather than
+        # by count, so a slow tick shortens what is left of the wait instead
+        # of extending it.
+        deadline = time.monotonic() + timeout_s
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            code = self._wait_once(min(remaining, self.tick_s))
+            if code is not None:
+                return code
+            self.on_tick()
+
+    def _wait_once(self, timeout_s: float) -> int | None:
         try:
             result = self.container.wait(timeout=timeout_s)
         except Exception as exc:  # docker-py surfaces timeouts as requests errors
@@ -164,7 +191,7 @@ class DockerDriver(SandboxDriver):
         )
 
     # -- run ---------------------------------------------------------------
-    def run(self, spec: SandboxSpec) -> SandboxResult:
+    def run(self, spec: SandboxSpec, *, on_output: OutputCallback | None = None) -> SandboxResult:
         spec.validate()
         self._validate_mounts(spec)
 
@@ -215,8 +242,16 @@ class DockerDriver(SandboxDriver):
             timeout_s=spec.timeout_s,
         )
 
+        handle = _ContainerHandle(
+            container,
+            on_tick=(
+                None
+                if on_output is None
+                else partial(self._offer_output, spec, container, on_output)
+            ),
+        )
         try:
-            outcome = enforce_deadline(_ContainerHandle(container), spec.timeout_s, spec.grace_s)
+            outcome = enforce_deadline(handle, spec.timeout_s, spec.grace_s)
             stdout, stderr = self._collect_logs(container)
             oom = self._was_oom_killed(container)
 
@@ -438,6 +473,24 @@ class DockerDriver(SandboxDriver):
             return raw
 
         return read(stdout=True, stderr=False), read(stdout=False, stderr=True)
+
+    def _offer_output(self, spec: SandboxSpec, container: Any, on_output: OutputCallback) -> None:
+        """Hand a live consumer the output so far. Never raises.
+
+        A broken consumer — a bucket that is down, a redaction that throws —
+        must not turn a healthy analyzer into a degraded stage, so its failure
+        is logged here and the wait carries on (ADR-0008, ADR-0033).
+        """
+        try:
+            stdout, stderr = self._collect_logs(container)
+            on_output(stdout, stderr)
+        except Exception as exc:
+            log.warning(
+                "sandbox.live_output_failed",
+                run_id=spec.run_id,
+                analyzer=spec.analyzer,
+                error=str(exc),
+            )
 
     def _was_oom_killed(self, container: Any) -> bool:
         try:

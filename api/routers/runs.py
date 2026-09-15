@@ -322,7 +322,14 @@ async def stream_events(run_id: str) -> StreamingResponse:
                     "status": run.status,
                     "phase": _phase(run, stages),
                     "stages": [
-                        {"analyzer": s.analyzer, "status": s.status, "duration_s": s.duration_s}
+                        {
+                            # The address of the stage's log, which the
+                            # progress panel reads while the stage runs.
+                            "id": s.id,
+                            "analyzer": s.analyzer,
+                            "status": s.status,
+                            "duration_s": s.duration_s,
+                        }
                         for s in stages
                     ],
                     "finding_count": session.scalar(
@@ -587,25 +594,46 @@ def get_stage_logs(
     stage_id: str,
     session: Annotated[Session, Depends(get_session)],
 ) -> PlainTextResponse:
-    """The retained stdout/stderr of one stage, as plain text.
+    """The stdout/stderr of one stage, as plain text.
 
     ``text/plain`` is the whole XSS story: a browser and the dashboard alike
     get inert characters, never markup. The dashboard renders it into a
     ``<pre>`` with no HTML parsing on the path from bucket to pixels.
+
+    ``X-Bare-Log-State`` says which document this is (ADR-0033): ``final`` is
+    the log retained when the stage ended; ``live`` is the latest redacted
+    snapshot of a stage still running, which a later request may extend;
+    ``partial`` is the last snapshot of a stage that will never finish,
+    because its run is already over.
     """
     stage = session.get(RunStage, stage_id)
     if stage is None or stage.run_id != run_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "stage not found")
-    if not stage.log_key:
+
+    from core.pipeline.logs import read_stage_log, stage_log_key
+
+    store = get_object_store()
+    if stage.log_key:
+        key, state = stage.log_key, "final"
+    elif StageStatus(stage.status) in (StageStatus.PENDING, StageStatus.RUNNING):
+        # Still running: its snapshot sits where the retained log will, and the
+        # row points at nothing until the stage ends.
+        key = stage_log_key(run_id, stage.id)
+        if not store.exists(key):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "no output yet")
+        run = session.get(Run, run_id)
+        running = run is not None and not RunStatus(run.status).is_terminal
+        state = "live" if running else "partial"
+    else:
         # A stage from before log retention, or one whose bucket write failed.
         # 404 with a reason rather than an empty 200: an empty log and no log
         # are different facts, and only one of them is a lie about the first.
+        # A snapshot left at the key is not served in its place — `log_key` is
+        # the statement that a finished stage kept its log.
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no log retained for this stage")
 
-    from core.pipeline.logs import read_stage_log
-
     try:
-        text = read_stage_log(get_object_store(), stage.log_key)
+        text = read_stage_log(store, key)
     except Exception as exc:
         # The detail stays generic: a storage client's exception text names
         # endpoints and buckets, which is the operator's log, not the response.
@@ -617,6 +645,7 @@ def get_stage_logs(
             "Content-Security-Policy": "default-src 'none'; sandbox",
             "X-Content-Type-Options": "nosniff",
             "Cache-Control": "no-store",
+            "X-Bare-Log-State": state,
         },
     )
 

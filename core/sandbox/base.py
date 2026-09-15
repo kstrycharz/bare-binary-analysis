@@ -10,12 +10,20 @@ rewriting every analyzer, which is exactly the trap this interface avoids.
 from __future__ import annotations
 
 import abc
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 
 from core.sandbox.spec import SandboxSpec
+
+OutputCallback = Callable[[bytes, bytes], None]
+"""Receives a running container's stdout and stderr *so far*.
+
+Whole streams rather than deltas, so a consumer that skips a call loses
+nothing, and capped exactly as the final :class:`SandboxResult` streams are.
+It is called on the thread enforcing the container's deadline, so it must be
+cheap or throttle itself (ADR-0033)."""
 
 
 class SandboxStatus(StrEnum):
@@ -139,13 +147,19 @@ class SandboxDriver(abc.ABC):
     name: str = "abstract"
 
     @abc.abstractmethod
-    def run(self, spec: SandboxSpec) -> SandboxResult:
+    def run(self, spec: SandboxSpec, *, on_output: OutputCallback | None = None) -> SandboxResult:
         """Run one container to completion, timeout, or failure.
 
         Must not raise for analyzer-level failures — a crashed or hung analyzer
         is a :class:`SandboxResult` with a degraded status, because one bad
         analyzer must never fail the whole run. Raises only for programmer
         error (an invalid spec).
+
+        ``on_output``, when given, is offered the container's output so far
+        while it runs — the only view of an analyzer before its container is
+        reaped (ADR-0033). It must never change the result: a consumer that
+        raises is logged and ignored, and the deadline is enforced as if it
+        were absent.
         """
 
     @abc.abstractmethod

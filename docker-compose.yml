@@ -52,6 +52,8 @@ x-backend-env: &backend-env
   # Memory ceiling per analyzer container. A 213 MB installer unpacks to
   # ~69 000 files, which is the shape that pushes against this.
   BARE_ANALYZER_MEMORY_GB: ${BARE_ANALYZER_MEMORY_GB:-8}
+  # Seconds between redacted snapshots of a running stage's output (ADR-0033).
+  BARE_LIVE_LOG_INTERVAL_S: ${BARE_LIVE_LOG_INTERVAL_S:-5}
 
 services:
   postgres:

@@ -294,6 +294,34 @@ class BareClient:
         result = self._request("GET", f"/api/runs/{run_id}/sarif")
         return dict(result or {})
 
+    def get_stage_log(self, run_id: str, stage_id: str) -> tuple[str, str] | None:
+        """One stage's analyzer output and what it is: ``live`` while the stage
+        runs, ``final`` once retained, ``partial`` for a stage that never
+        finished. ``None`` when there is nothing to read yet.
+
+        Plain text rather than JSON, so not `_request`. A 404 is an ordinary
+        answer here — nothing printed yet — not an error.
+        """
+        path = f"/api/runs/{run_id}/stages/{stage_id}/logs"
+        headers = {**self._headers(), "Accept": "text/plain"}
+        request = urllib.request.Request(f"{self.base_url}{path}", headers=headers, method="GET")
+        try:
+            with urllib.request.urlopen(request, timeout=self._timeout_s) as response:
+                text = response.read().decode("utf-8", "replace")
+                state = str(response.headers.get("X-Bare-Log-State") or "final")
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                return None
+            detail = exc.read().decode("utf-8", "replace")
+            raise ApiError(
+                f"GET {path} failed: HTTP {exc.code}", status=exc.code, body=detail
+            ) from None
+        except urllib.error.URLError as exc:
+            raise ApiError(f"cannot reach {self.base_url}: {exc.reason}") from None
+        except OSError as exc:  # TimeoutError included
+            raise ApiError(f"GET {path} failed: {exc}") from None
+        return text, state
+
     def wait_for_run(
         self,
         run_id: str,

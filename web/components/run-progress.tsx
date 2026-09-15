@@ -14,13 +14,20 @@
  * phase is a state the pipeline is observably in; the fill is discrete and the
  * current phase is named. Where a real estimate exists — this same artifact has
  * been scanned before — it is shown and labelled as coming from that run.
+ *
+ * "Show logs" opens each stage's analyzer output as it is printed (ADR-0033),
+ * for the scan that looks stuck or is about to degrade. Off by default, and
+ * remembered per browser: it is a debugging view, not the progress panel.
  */
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Panel, StatusDot, duration } from "@/components/ui";
+import { Button, Panel, StatusDot, duration } from "@/components/ui";
+import { LiveStageLog } from "@/components/live-stage-log";
 
 interface StageEvent {
+  /** Absent from an API older than live logs; such a stage simply has none. */
+  id?: string;
   analyzer: string;
   status: string;
   duration_s: number | null;
@@ -48,6 +55,8 @@ const PHASES: { key: string; label: string; detail: string }[] = [
 
 const TERMINAL = new Set(["completed", "degraded", "failed", "cancelled"]);
 
+const SHOW_LOGS_KEY = "bare.run-progress.show-logs";
+
 function useElapsed(startedAt: string | null): number | null {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -56,6 +65,31 @@ function useElapsed(startedAt: string | null): number | null {
   }, []);
   if (!startedAt) return null;
   return Math.max(0, (now - new Date(startedAt).getTime()) / 1000);
+}
+
+/** A per-browser preference. Storage can be absent or throw (private windows,
+ *  blocked site data); the panel then just starts with logs hidden. */
+function useShowLogs(): [boolean, () => void] {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    try {
+      setShow(window.localStorage.getItem(SHOW_LOGS_KEY) === "1");
+    } catch {
+      /* default stands */
+    }
+  }, []);
+  function toggle() {
+    setShow((previous) => {
+      const next = !previous;
+      try {
+        window.localStorage.setItem(SHOW_LOGS_KEY, next ? "1" : "0");
+      } catch {
+        /* the toggle still works for this page view */
+      }
+      return next;
+    });
+  }
+  return [show, toggle];
 }
 
 export function RunProgress({
@@ -76,6 +110,7 @@ export function RunProgress({
     expected_s: null,
   });
   const [connected, setConnected] = useState(false);
+  const [showLogs, toggleLogs] = useShowLogs();
   const refreshed = useRef(false);
 
   useEffect(() => {
@@ -113,13 +148,28 @@ export function RunProgress({
   // phase, because nothing is known about progress inside one.
   const percent = done ? 100 : Math.round((index / PHASES.length) * 100);
 
+  const logStages = state.stages.filter(
+    (stage): stage is StageEvent & { id: string } => typeof stage.id === "string",
+  );
+
   return (
     <Panel
       title="Scanning"
       actions={
-        <span className="text-xs text-content-subtle">
-          {connected ? "live" : "reconnecting…"}
-        </span>
+        <>
+          <span className="text-xs text-content-subtle">
+            {connected ? "live" : "reconnecting…"}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={toggleLogs}
+            aria-pressed={showLogs}
+            aria-controls="scan-logs"
+          >
+            {showLogs ? "Hide logs" : "Show logs"}
+          </Button>
+        </>
       }
     >
       <div className="space-y-3 px-4 py-4">
@@ -204,23 +254,44 @@ export function RunProgress({
         </span>
       </div>
 
-      {state.stages.length > 0 && (
-        <ul className="border-t border-border">
-          {state.stages.map((stage) => (
-            <li
-              key={stage.analyzer}
-              className="flex flex-wrap items-center gap-3 border-b border-border/60 px-4 py-2 last:border-0"
-            >
-              <span className="w-16 shrink-0 font-mono text-xs">{stage.analyzer}</span>
-              <StatusDot status={stage.status} />
-              {stage.duration_s !== null && (
-                <span className="ml-auto text-xs tnum text-content-subtle">
-                  {duration(stage.duration_s)}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
+      {showLogs ? (
+        <div id="scan-logs" className="border-t border-border">
+          {logStages.length === 0 ? (
+            <p className="px-4 py-3 text-xs text-content-subtle">
+              No analyzer has started yet. Its output appears here once the first container
+              does.
+            </p>
+          ) : (
+            logStages.map((stage) => (
+              <LiveStageLog
+                key={stage.id}
+                runId={runId}
+                stageId={stage.id}
+                analyzer={stage.analyzer}
+                status={stage.status}
+              />
+            ))
+          )}
+        </div>
+      ) : (
+        state.stages.length > 0 && (
+          <ul className="border-t border-border">
+            {state.stages.map((stage) => (
+              <li
+                key={stage.analyzer}
+                className="flex flex-wrap items-center gap-3 border-b border-border/60 px-4 py-2 last:border-0"
+              >
+                <span className="w-16 shrink-0 font-mono text-xs">{stage.analyzer}</span>
+                <StatusDot status={stage.status} />
+                {stage.duration_s !== null && (
+                  <span className="ml-auto text-xs tnum text-content-subtle">
+                    {duration(stage.duration_s)}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )
       )}
     </Panel>
   );
