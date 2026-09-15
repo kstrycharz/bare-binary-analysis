@@ -39,8 +39,10 @@ capable: your artifacts never leave your network.
 | **Reporting** | SARIF 2.1.0, CycloneDX 1.5, PDF release record, JSON |
 | **AI layer** *(optional)* | LiteLLM for hosted providers, Ollama for local — triage, explanation, and bounded agentic investigation with read-only tools |
 
-Ghidra-backed cross-referencing and dynamic (detonation) analysis are designed
-and not yet built — see [Status](#status).
+After each scan, Ghidra runs headless over the flagged executables and names
+the function that references each flagged string, so a finding reads
+`broker.exe 0x8200 in connect_broker()` rather than only an offset. Dynamic
+(detonation) analysis is designed and not yet built — see [Status](#status).
 
 ---
 
@@ -168,7 +170,9 @@ and none of it is required.
 Reports come out as SARIF (for code scanning), PDF (for the release record),
 CycloneDX (for the SBOM), and JSON.
 
-Not yet built: Ghidra cross-references, dynamic analysis, and MCP servers.
+Not yet built: dynamic analysis and MCP servers. Ghidra cross-references name
+the referencing function only — no crypto-constant search or decompiled context
+yet.
 
 You can verify the isolation boundary yourself — it reports what the analyzer
 observed from *inside* its own container, which is the only measurement that

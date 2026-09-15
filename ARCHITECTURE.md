@@ -185,7 +185,7 @@ Each stage is a Celery task producing `Evidence` rows.
 | **S1 Identify** | LIEF/pefile/pyelftools, arch, packer ID, and build metadata: PE Rich header, Go build info, .NET attributes, PDB path, code-signing chain and expiry | M1 |
 | **S2 Unpack** | Recursive: NSIS, InnoSetup, MSI, CAB, 7z, squashfs, cpio, UEFI/UBI/JFFS2, APK/IPA, ASAR, PyInstaller, .NET, JAR, UPX. Every extracted file re-enters S1 as a child artifact | M2 |
 | **S3 Static** | strings (ASCII **and** UTF-16LE) with offsets, secret rules, YARA, sliding-window entropy, embedded certs and private keys, capa, config/resource extraction, symbol and RTTI leakage, PDB and DWARF source paths | M1–M2 |
-| **S4 Deep RE** | Ghidra headless: xrefs to flagged strings, hardcoded crypto constants, decompiled context windows | M5 |
+| **S4 Deep RE** | Ghidra headless: xrefs to flagged strings (built; ADR-0034), hardcoded crypto constants, decompiled context windows | M5 |
 | **S5 Dynamic** | Opt-in. Wine or qemu-user under strace/ltrace with a sinkhole netns | M5 |
 | **S6 Correlate** | Dedupe across the artifact tree, score by entropy/confidence/context, filter against the false-positive corpus | M2 |
 | **S7 Triage** | LLM classification, explanation, remediation | M3 |
@@ -193,8 +193,8 @@ Each stage is a Celery task producing `Evidence` rows.
 
 The table is the design; the milestone column is when each part was planned,
 not a claim that all of it shipped. Not built today: SSDEEP/TLSH hashing, YARA,
-UPX unpacking, RTTI and Rich-header extraction, HTML reports, and all of S4 and
-S5. Reports ship as PDF, SARIF, CycloneDX, and JSON. The README's "Under the
+UPX unpacking, RTTI and Rich-header extraction, HTML reports, S4's
+crypto-constant search and decompiled context, and all of S5. Reports ship as PDF, SARIF, CycloneDX, and JSON. The README's "Under the
 hood" table lists the tools that actually do the work.
 
 Two details that decide whether the tool is useful:

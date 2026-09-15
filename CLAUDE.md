@@ -53,7 +53,10 @@ those findings into a ship / do-not-ship decision with a meaningful exit code,
 so BARE is a build-pipeline stage gate and not only a dashboard. Analyzer
 output is kept per stage, redacted at write time (ADR-0032), and readable while the stage is still
 running (ADR-0033); `bare waive` writes
-waivers the gate will honour, and `bare sbom-diff` compares two builds.
+waivers the gate will honour, and `bare sbom-diff` compares two builds. Once a
+scan finishes, Ghidra runs headless over the flagged executables on the slow
+lane and names the function that references each flagged string — enrichment
+that cannot change a finding or a verdict (ADR-0034).
 
 Deployment is two commands and no file editing — the dashboard's first-run
 wizard mints the API token and optionally connects a model:
@@ -101,10 +104,12 @@ make install && make sandbox-check     # ./make.ps1 on Windows
 Verified: 756 unit tests, 19 integration tests, `mypy --strict` clean on
 `core/`, `ruff` clean, `next build` clean.
 
-Not yet started: Ghidra and dynamic analysis (M5), MCP servers (M5), and the
-`remediate` role.
+Not yet started: dynamic analysis (M5), MCP servers (M5), and the `remediate`
+role. Of S4, only cross-references to flagged strings exist; the crypto-constant
+search and decompiled context windows do not.
 
-**Next milestone: M5 — Ghidra cross-references and dynamic analysis. Reporting
+**Next milestone: M5 — dynamic analysis. Ghidra cross-references have landed
+(`bare/ghidra`, ADR-0034). Reporting
 (SARIF, PDF, CycloneDX) has landed; see `/api/runs/{id}/report.pdf` and
 `/sbom`. `bare sbom RUN_ID` exports one for any past run.**
 
@@ -147,6 +152,7 @@ Append-only; supersede rather than edit.
 - **ADR-0030** — The packaged LLM config ships inert (2026-08-27)
 - **ADR-0031** — The Runs list refreshes on a fingerprint event, not on polling the list (2026-09-11)
 - **ADR-0033** — A running stage's log is published as it grows, through the retained log's own path (2026-09-14)
+- **ADR-0034** — Ghidra is pinned upstream, and runs as enrichment after the scan (2026-09-14)
 
 ---
 
@@ -190,7 +196,10 @@ computation the gate already does, surfaced for a human rather than a pipeline.
 | --- | --- |
 | Medium | `PodmanDriver` and `GvisorDriver` raise `NotImplementedError`. Scheduled M6. Rootless Podman is a hard requirement for some enterprises. |
 | Medium | `NetworkMode.SINKHOLE` raises in `DockerDriver._build_create_kwargs`. Dynamic analysis lands M5. Failing loudly is deliberate — a silent fallback to a bridge would hand an artifact real egress. |
-| Medium | The seccomp allowlist has only been exercised against a slim Python image. Ghidra (JVM) and Wine are likely to need additions. Validate per image as they are built; do not weaken the profile globally in response to one failure. |
+| Medium | The seccomp allowlist has been exercised against the slim Python images and Ghidra 12.1.3 on JDK 21 (import, analysis, script compilation, native decompiler — no additions needed). Wine is likely to need some. Validate per image as it is built; do not weaken the profile globally in response to one failure. |
+| Medium | Ghidra only sees binaries whose bytes were retained: the root artifact and extracted evidence-bearing files up to `RETAIN_EXTRACTED_MAX_BYTES` (32 MB). A flagged string inside a larger extracted executable gets no `xref_function`; the ghidra stage's error names each one. |
+| Low | S4 writes function names only. The crypto-constant search and decompiled context windows in the design are not built, and `XrefSite.context` is written as null on purpose — a decompiled use site contains the secret literal, so it cannot be stored until it can be stored masked. |
+| Low | CI builds only `bare/hello`, so `tests/integration/test_ghidra_image.py` skips there. Building Ghidra is a 569 MB download per job without a layer cache. |
 | Medium | `_active_run_ids()` in `core/orchestrator/tasks.py` returns `None` until the `runs` table exists, degrading the reaper to age-based cleanup. M1 is complete and it is still not wired. |
 | Medium | The artifact tree in the run detail response is capped at 500 nodes. The count stays exact and every artifact is still scanned, but there is no way to page through the rest — a real explorer needs its own paginated endpoint. |
 | High | Context snippets mask only their own finding's value. Neighbouring secrets in the 60-byte window — the other half of a credential pair, or a UTF-16 string that reads as `g.h.p._...` — are stored in the clear, and triage and explain send them to the model as "value masked". `llm_calls.prompt_rendered` keeps the exact prompt, so past calls hold them too. Fix in review: #14. |

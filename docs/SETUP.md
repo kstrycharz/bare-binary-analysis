@@ -104,11 +104,16 @@ New-Item -ItemType Directory -Force -Path C:\bare\runs
 make images
 ```
 
-This builds three analyzer images:
+This builds four analyzer images:
 
 - `bare/hello:dev` — the reference analyzer and isolation probe
 - `bare/static:dev` — string extraction, rule matching, entropy, file ID
 - `bare/unpack:dev` — recursive unpacking of nested containers
+- `bare/ghidra:dev` — Ghidra headless, naming the function that references
+  each flagged string. The first build downloads the pinned 569 MB Ghidra
+  release from the NSA's GitHub releases and verifies its SHA-256, and the image
+  is about 2 GB. Set `BARE_GHIDRA_ENABLED=false` to run without it; nothing
+  about findings or the gate changes (ADR-0034).
 
 You can skip this step: they are Compose services (ADR-0028), so `make dev`
 below builds them along with everything else. Run it on its own when you want

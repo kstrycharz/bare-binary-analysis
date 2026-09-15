@@ -998,3 +998,94 @@ retained log from a snapshot.
 the database every two seconds for every open panel. Adding a bucket read per
 stage per tick, whether or not anyone opened the logs, is the bulk read
 `StageLogDisclosure` was written to avoid.
+
+---
+
+## ADR-0034 — Ghidra is pinned upstream, and runs as enrichment after the scan
+
+**Date:** 2026-09-14
+**Status:** Accepted
+
+### Context
+
+S4 was designed in from M0 — a `ghidra` Celery queue, a `worker-heavy` lane
+that consumes it, and a `FindingLocation.xref_function` column — and nothing
+filled any of it. Filling it meant answering three questions: how a 569 MB
+third-party distribution gets into an image without BARE vendoring it; where in
+a run it executes; and what its failure means for the run and the release gate.
+
+### Decision
+
+**Pinned upstream, verified, never vendored.** `sandbox/images/ghidra/
+ghidra.lock.json` records the version, the release asset URL on the NSA's own
+GitHub releases, and the SHA-256 the release notes publish. The Dockerfile's
+ARG defaults repeat those values and `tests/unit/test_ghidra_pin.py` holds the
+two equal. The build `sha256sum --check`s the archive before unzipping it, so a
+proxy's error page fails loudly instead of producing a Ghidra with a missing
+class. `scripts/fetch_ghidra.py --check-upstream` reports newer releases, and a
+bump is a human's commit: a new Ghidra can name functions differently. An
+air-gapped build overrides `GHIDRA_URL` to a mirror; the digest check does not
+change.
+
+**After the scan, as its own task, on the slow lane.** `scan_run` dispatches
+`bare.ghidra_run` once the run is terminal (`completed` or `degraded`) with at
+least one finding. Only `worker-heavy` consumes the `ghidra` queue. Only
+executables (PE, ELF, Mach-O) that carry a finding at a file offset are sent,
+and Ghidra is asked only about those offsets. The bytes come from object
+storage, because scan staging is deleted when the scan ends.
+
+**Enrichment cannot degrade a run.** The stage writes one column,
+`FindingLocation.xref_function` (after passing it through the rule pack's
+redaction, as stage logs are). It creates no finding and changes no value,
+offset, status or severity (§9). Its failure is therefore recorded on its own
+stage — `failed`, `timeout`, `truncated`, with a reason — and excluded from
+`degraded_stages()` through `ENRICHMENT_ANALYZERS`, the one definition that the
+run status and the gate both read. A run with every finding present does not
+become INCONCLUSIVE because Ghidra could not name a function.
+
+**One `analyzeHeadless` per binary.** Each binary gets its own status and its
+own clock; a timeout kills the process group, so the JVM and the native
+decompiler go with the launcher script. Ghidra's own analysis timeout fires
+first so the post-script still runs over partial analysis. The JVM heap is 60%
+of the container limit, leaving room for the decompiler process and JVM
+overhead so memory pressure surfaces as a per-binary error, not a container OOM.
+
+**The cross-referencing script is Java, and stores no decompiled source.**
+`sandbox/ghidra_scripts/BareXrefs.java` uses the documented `GhidraScript` API
+and Ghidra's bundled Gson, so the image needs nothing beyond the JDK. It maps
+each file offset through the loader, walks back to the start of a containing
+string (a rule can match mid-string), and follows one hop through a pointer
+slot (`static const char *KEY = "..."`). The contract's `context` field is
+written as null: a decompiled use site contains the string literal, and the
+string literal is the secret.
+
+### Consequences
+
+- The first `docker compose up` downloads 569 MB and builds a ~2 GB image.
+- The existing seccomp allowlist holds for Ghidra 12.1.3 on JDK 21 — import,
+  auto-analysis, script compilation and the native decompiler, verified under
+  the driver's full isolation and ulimits. No profile change was needed.
+- Evidence-bearing extracted files over `RETAIN_EXTRACTED_MAX_BYTES` are not
+  retained and so not analysed. The stage names each one.
+- A gate evaluated while enrichment is still running returns the same verdict
+  it will afterwards; `xref_function` is not a policy input.
+- A worker that dies mid-stage leaves a `running` stage on a terminal run, which
+  the run-level orphan sweep cannot see; `fail_stale_enrichment_stages` closes
+  it after `orphan_running_timeout_seconds`.
+
+### Alternatives rejected
+
+**Inline in `scan_run`.** Simpler — staging is still on disk — but it holds a
+fast-lane worker for Ghidra's entire run, which is the starvation §4 split the
+queues to prevent, and it makes the report wait on enrichment it does not need.
+
+**Degrade the run when Ghidra fails.** ADR-0018 says an incomplete *scan*
+cannot pass. A failed Ghidra leaves the findings complete; making the gate
+INCONCLUSIVE would block releases on a third-party JVM's bad day.
+
+**Vendor Ghidra, or publish a prebuilt image.** Either makes BARE a
+redistributor of a 569 MB NSA distribution. A URL and a digest reproduce the
+same bytes without that.
+
+**PyGhidra instead of a Java post-script.** Adds a pip dependency to an image
+that opens untrusted binaries and should carry nothing it does not need.
