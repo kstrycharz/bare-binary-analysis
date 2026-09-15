@@ -12,7 +12,7 @@ import structlog
 from sqlalchemy import func, select
 
 from core.db import session_scope
-from core.orchestrator.celery_app import QUEUE_LLM, QUEUE_STATIC, celery_app
+from core.orchestrator.celery_app import QUEUE_GHIDRA, QUEUE_LLM, QUEUE_STATIC, celery_app
 
 log = structlog.get_logger(__name__)
 
@@ -38,6 +38,15 @@ def scan_run(self: Any, run_id: str) -> dict[str, Any]:
         log.info("scan.duplicate_delivery", run_id=run_id, detail=str(exc))
         return {"run_id": run_id, "status": "already_running", "skipped": True}
 
+    if _should_enrich(outcome):
+        # After the scan's transaction has committed, so the Ghidra worker never
+        # reads a run that is not yet terminal. A broker failure here costs the
+        # enrichment and never the scan (ADR-0034).
+        try:
+            ghidra_run_task.delay(run_id)
+        except Exception as exc:
+            log.warning("ghidra.dispatch_failed", run_id=run_id, error=str(exc))
+
     return {
         "run_id": outcome.run_id,
         "status": str(outcome.status),
@@ -46,6 +55,34 @@ def scan_run(self: Any, run_id: str) -> dict[str, Any]:
         "suppressed": outcome.suppressed_count,
         "error": outcome.error,
     }
+
+
+def _should_enrich(outcome: Any) -> bool:
+    """Whether a finished scan has anything for Ghidra to cross-reference."""
+    from core.config import get_settings
+    from core.models.enums import RunStatus
+
+    return bool(
+        get_settings().ghidra_enabled
+        and outcome.finding_count
+        and outcome.status in (RunStatus.COMPLETED, RunStatus.DEGRADED)
+    )
+
+
+@celery_app.task(name="bare.ghidra_run", queue=QUEUE_GHIDRA, max_retries=0)
+def ghidra_run_task(run_id: str) -> dict[str, Any]:
+    """Name the functions that reference a finished run's flagged strings (S4).
+
+    Its own task on the `ghidra` queue, which only `worker-heavy` consumes, so a
+    Ghidra job that runs for twenty minutes holds the slow lane and not the
+    scanners (§4). ``max_retries=0`` for the scan's reason: a binary that wedged
+    Ghidra once wedges it again.
+    """
+    from core.pipeline.ghidra import enrich_run
+
+    with session_scope() as session:
+        outcome = enrich_run(run_id, session)
+    return outcome.to_dict()
 
 
 @celery_app.task(name="bare.triage_run", queue=QUEUE_LLM, max_retries=0)

@@ -35,8 +35,9 @@ import structlog
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from core.models import AuditLog, Run
-from core.models.enums import AuditAction, RunStatus
+from core.models import AuditLog, Run, RunStage
+from core.models.enums import AuditAction, RunStatus, StageStatus
+from core.pipeline.stages import ENRICHMENT_ANALYZERS
 
 log = structlog.get_logger(__name__)
 
@@ -188,3 +189,36 @@ def _fail(session: Session, run: Run, moment: datetime, reason: str) -> None:
         )
     )
     log.warning("recovery.run_failed", run_id=run.id, reason=reason)
+
+
+def fail_stale_enrichment_stages(
+    session: Session, *, timeout_s: int, now: datetime | None = None
+) -> list[str]:
+    """Close enrichment stages that a dead worker left ``running``.
+
+    The run sweep above cannot see them: an enrichment stage starts after its
+    run is already terminal (ADR-0034), so no run is left queued or running to
+    be found. Without this, a worker restarted in the middle of a Ghidra job
+    leaves a stage that reads "running" for ever. Returns the stage ids closed.
+    """
+    moment = now or datetime.now(UTC)
+    closed: list[str] = []
+    stages = session.scalars(
+        select(RunStage).where(
+            RunStage.analyzer.in_(sorted(ENRICHMENT_ANALYZERS)),
+            RunStage.status.in_([StageStatus.PENDING, StageStatus.RUNNING]),
+        )
+    ).all()
+    for stage in stages:
+        anchor = stage.started_at or stage.created_at
+        reference = _naive_if_needed(moment, anchor)
+        if reference - anchor < timedelta(seconds=timeout_s):
+            continue
+        stage.status = StageStatus.FAILED
+        stage.finished_at = reference
+        stage.error = "orphaned: the worker running this stage stopped before recording a result"
+        closed.append(stage.id)
+        log.warning(
+            "recovery.stage_failed", run_id=stage.run_id, stage_id=stage.id, analyzer=stage.analyzer
+        )
+    return sorted(closed)

@@ -21,6 +21,7 @@ from core.orchestrator.celery_app import QUEUE_CONTROL, celery_app
 from core.orchestrator.scan_tasks import (
     discover_rules_task,
     explain_finding_task,
+    ghidra_run_task,
     investigate_finding_task,
     scan_run,
     summarize_run_task,
@@ -34,6 +35,7 @@ log = structlog.get_logger(__name__)
 __all__ = [
     "discover_rules_task",
     "explain_finding_task",
+    "ghidra_run_task",
     "investigate_finding_task",
     "reap_containers",
     "recover_orphaned_runs",
@@ -104,7 +106,7 @@ def recover_orphaned_runs() -> dict[str, Any]:
     """
     settings = get_settings()
     from core.db import session_scope
-    from core.pipeline.recovery import sweep_orphaned_runs
+    from core.pipeline.recovery import fail_stale_enrichment_stages, sweep_orphaned_runs
 
     try:
         with session_scope() as session:
@@ -114,12 +116,21 @@ def recover_orphaned_runs() -> dict[str, Any]:
                 running_timeout_s=settings.orphan_running_timeout_seconds,
                 max_requeue_attempts=settings.orphan_max_requeue_attempts,
             )
-            report = sweep.to_dict()
+            stale = fail_stale_enrichment_stages(
+                session, timeout_s=settings.orphan_running_timeout_seconds
+            )
+            report = {**sweep.to_dict(), "stale_stages": stale}
             requeue = list(sweep.requeued)
     except Exception as exc:
         # A failing sweep must not crash beat; it runs again next interval.
         log.warning("recovery.sweep_failed", error=str(exc))
-        return {"inspected": 0, "requeued": [], "failed": [], "error": str(exc)}
+        return {
+            "inspected": 0,
+            "requeued": [],
+            "failed": [],
+            "stale_stages": [],
+            "error": str(exc),
+        }
 
     # Dispatch only after the transaction committed, so a run can never be
     # re-dispatched against an audit entry that was rolled back.
@@ -129,7 +140,7 @@ def recover_orphaned_runs() -> dict[str, Any]:
         except Exception as exc:
             log.warning("recovery.redispatch_failed", run_id=run_id, error=str(exc))
 
-    if report["requeued"] or report["failed"]:
+    if report["requeued"] or report["failed"] or report["stale_stages"]:
         log.info("recovery.sweep", **report)
     return report
 

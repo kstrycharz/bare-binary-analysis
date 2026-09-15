@@ -412,6 +412,14 @@ function FindingDetail({
                     {location.encoding}
                   </span>
                 )}
+                {location.xref_function && (
+                  <span
+                    className="ml-1.5 text-content-subtle"
+                    title="The function that references this string, as named by Ghidra"
+                  >
+                    in <span className="text-content">{location.xref_function}()</span>
+                  </span>
+                )}
               </li>
             ))}
           </ul>

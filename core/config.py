@@ -105,6 +105,21 @@ class Settings(BaseSettings):
     analyzer is near real time and a chatty one is not slowed by being watched.
     ``0`` turns live snapshots off; the log retained when a stage ends is
     unaffected."""
+    ghidra_enabled: bool = True
+    """Run Ghidra over flagged executables once a scan finishes (S4).
+
+    Enrichment only: it names the function that references each flagged string,
+    and can never add, remove, or re-grade a finding — so turning it off changes
+    no finding and no gate verdict (ADR-0034). Turn it off on a worker host that
+    cannot spare the memory, or a deployment that has not built bare/ghidra."""
+
+    ghidra_memory_gb: float = 4.0
+    """Memory ceiling for the Ghidra container, in GiB.
+
+    The JVM heap is sized to 60% of it inside the container; the remainder is
+    the native decompiler and the JVM's own overhead. Raise it before scanning
+    large firmware images or Electron binaries, where auto-analysis is what
+    runs out first."""
 
     reaper_max_age_hours: int = 6
     reaper_interval_seconds: int = 300
