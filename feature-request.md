@@ -354,6 +354,111 @@ cross-references that show whether a hardcoded credential is actually reachable.
 finding, what it is built with, what it bundles, and what it appears to reach
 out to.
 
+### `scan-config` — scan configurations that actually change the scan · **M**
+
+Every scan runs the same way. `--profile quick|standard|deep` is accepted by
+`bare scan` and the upload API, stored on `Run.profile`, and echoed back in
+responses — and nothing in the pipeline reads it. The full rule pack runs,
+every analyzer runs, the unpack budget scales the same way, and Ghidra
+enrichment is on or off for the whole deployment (`BARE_GHIDRA_ENABLED`). A team
+checking a nightly build for leaked secrets and a release manager signing off a
+firmware image get the same scan. The New scan page does not offer a choice at
+all.
+
+**Wanted:** named scan configurations that decide what a run does, picked at
+upload in the dashboard and with `bare scan --config <name>`:
+
+- which rule categories or rule ids run — secrets only, say, or everything plus
+  the recon sweep;
+- which stages run — unpack depth and budgets, whether Ghidra enrichment runs,
+  whether components are inventoried, and later dynamic analysis;
+- per-stage timeouts and memory, within ceilings the operator sets.
+
+Defined as files (`.bare/scan-configs/*.yaml`, versioned alongside
+`.bare/policy.yaml`), with built-in `quick`, `standard`, and `deep` that finally
+give the existing `profile` field a meaning. A settings page lists them and sets
+the deployment default; the New scan page shows what each one runs before you
+choose it.
+
+**Watch out for:**
+- **A config may narrow a scan, never widen the sandbox.** No field for network,
+  the Docker socket, root, seccomp, or capabilities, and memory and timeouts
+  clamp to the operator's ceilings. Same rule as `analyzer-plugin`, and the same
+  kind of test: a hostile config cannot loosen `SandboxSpec`.
+- **The manifest records the config that ran** — its resolved content and hash,
+  not just its name. Otherwise two runs of one artifact with different findings
+  look like non-determinism.
+- **A narrow scan must not pass a gate it did not earn.** A secrets-only run
+  cannot PASS a policy that has component rules; that is INCONCLUSIVE, exactly
+  as a truncated unpack is (ADR-0018). A baseline scanned under a different
+  config is not a baseline either — "new since last build" against a `quick`
+  scan means nothing.
+- **Keep it apart from the policy.** The policy decides what blocks a release;
+  the config decides what gets looked at. Merging them is how a narrower scan
+  quietly turns into a passing gate.
+
+**Done when:** one artifact scanned with `quick` and with `deep` shows different
+stages and rule counts on the run page, each manifest names its config and hash,
+and a policy that needs a stage the config skipped returns INCONCLUSIVE.
+
+---
+
+### `sca-dashboard` — a composition view, with CVEs for the packages BARE finds · **L**
+
+BARE already knows what an artifact bundles. `core/composition` reads embedded
+`package.json`, `.dist-info/METADATA`, `.nuspec`, and Go build info into
+components with a name, version, ecosystem, licence, confidence, a Package URL,
+and the path in the unpack tree where each was found. On the dashboard all of
+that is a single link: **CycloneDX SBOM** on the run page downloads a JSON file.
+There is no table, no search, and no way to ask whether any of it is vulnerable.
+
+**Wanted:** a Components tab on the run page, and a CVE lookup behind it.
+
+- **Components table** — name, version, ecosystem, licence, confidence, and
+  provenance (`installer.exe → app.asar → node_modules/…`), with search, filters
+  by ecosystem and licence, and totals for each.
+- **Vulnerabilities per component** — advisory ids (CVE, GHSA, OSV), severity
+  and CVSS, affected and fixed versions, matched on Package URL and version
+  range. Sortable by severity, with "a fixed version exists" visible at a glance.
+- **Query across runs** — search a CVE id or a package and see every run and
+  component it touches. That is the question someone asks the morning an
+  advisory drops.
+- **Between builds** — vulnerabilities introduced and fixed against the baseline
+  run, the same way `bare sbom-diff` already diffs components.
+- **The same data outside the dashboard** — API endpoints for components and
+  vulnerabilities, and a CycloneDX `vulnerabilities` section in the SBOM export,
+  so CI sees what the dashboard sees.
+
+**The hard part is the air gap** (`docs/ROADMAP-COMPOSITION.md` §4, layer 2).
+Egress is denied by default, so the lookup cannot be a live call to OSV or NVD
+at scan time. It needs a mirrored advisory database imported as a versioned
+bundle, a documented way to refresh that bundle on a connected machine and carry
+it in, and — for deployments whose egress policy allows it — an optional online
+refresh run by the orchestrator, never by an analyzer.
+
+**Watch out for:**
+- **Every result states its advisory snapshot date.** "No known
+  vulnerabilities" means nothing without "as of"; a stale database is shown as
+  stale, not as clean.
+- **Matching is deterministic.** Package URL and version range in, advisory out,
+  using an existing tested version-range implementation per ecosystem rather
+  than hand-written comparisons, and no model anywhere in the match (§2.5). The
+  LLM layer may explain a vulnerability; it may not decide that one applies.
+- **Confidence carries through.** A component read from a declared manifest and
+  one inferred from weaker evidence are different facts; a CVE match is only as
+  sure as the component it hangs on, and the table says which.
+- **Advisories arrive after the scan.** Rematch stored components when the
+  database updates, without rescanning, and record which snapshot produced each
+  result so a signed release record stays reproducible.
+- **Blocking releases is a separate step.** `ROADMAP-COMPOSITION.md` §5 sketches
+  the policy keys (`max_cvss`, blocked licences, `advisory_max_age_days`). Ship
+  the view first; a dashboard feature must not quietly start failing builds.
+
+**Done when:** a scanned Electron installer shows its bundled npm packages in a
+searchable table, a package with an advisory in the imported snapshot shows the
+CVE and its fixed version, searching that CVE finds the run, and all of it works
+with egress denied.
+
 ---
 
 ## Also wanted
@@ -411,11 +516,9 @@ does the diffing. `bare sbom-diff RUN_A RUN_B` reporting added, removed, and
 version-changed components is a small command with an obvious audience.
 
 ### `vuln-enrichment` — join the SBOM to advisories · **L**
-Components are already identified by Package URL, which is the join key every
-advisory database uses. Matching against OSV would turn "what is in this
-artifact" into "what is wrong with what is in this artifact". Needs an answer
-for air-gapped deployments — an offline database bundle, not a live API call —
-which is most of the work and the reason it is an L.
+Now part of `sca-dashboard` above, which covers the offline advisory database,
+the matching, and where the results appear. Components are already identified by
+Package URL, the join key every advisory database uses.
 
 ### `github-action` — a real marketplace action · **M**
 `docs/CICD.md` calls the CLI directly, which works on every platform and is more
